@@ -5,7 +5,6 @@
  * 이메일은 DB 권한상 아무도 읽을 수 없어서, 내 이메일은 로그인 세션에서 가져온다.
  *
  * TODO(C): 프로필 사진은 Storage에 업로드 (지금은 http 주소만 저장)
- * TODO(C): getMateInfo — 후기 합계는 reviews 테이블 집계 RPC로 (누가 남겼는지는 숨김). 11/3 S13 때
  */
 import * as mock from '@/api/mock/users';
 import { requireAuthUser, sb, toApiError, USE_MOCK_API } from '@/api/supabaseHelpers';
@@ -57,7 +56,10 @@ export async function updateMe(input: ProfileInput): Promise<Me> {
   return getMe();
 }
 
-/** S13: 메이트 정보 (하트 수, 후기 항목별 합계, 만남 횟수) — 아직 가짜 데이터 */
+/** S13: 메이트 정보 (하트 수, 후기 항목별 합계, 만남 횟수). 누가 남겼는지는 서버에서 숨긴다 */
 export async function getMateInfo(userId: string): Promise<MateInfo> {
-  return mock.getMateInfo(userId);
+  if (USE_MOCK_API) return mock.getMateInfo(userId);
+  const { data, error } = await sb().rpc('get_mate_info', { p_user_id: userId });
+  if (error) throw toApiError(error, '메이트 정보를 불러오지 못했어요');
+  return data as MateInfo;
 }
