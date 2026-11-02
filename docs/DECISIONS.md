@@ -45,3 +45,14 @@ PRD와 다르게 정한 것, PRD의 `[결정 필요]` 항목을 정한 결과를
 | 혼자 지도 카테고리 (PRD S09 변경) | 식사·카페 2개 → **식당·카페·엔터테인먼트 3개** (`meal`·`cafe`·`entertainment`). 게시판 카테고리(식사·카페·공부·산책)와는 별개 | `theme.ts` `placeCategoryInfo`, `db.ts` `PlaceCategory` |
 | 웹 브라우저 | `react-native-maps`가 웹을 지원하지 않아, 브라우저에서는 장소 목록으로 대신 보여 준다 (개발 확인용) | `PlaceMap.web.tsx` |
 
+## 2026-11-03 결정
+
+| 항목 | 결정 | 코드 위치 |
+|---|---|---|
+| 약속이 있는 방 나가기 (PRD S12에 없음) | 시작 전 약속이 있는 참여자가 메뉴로 나가면 **약속 취소와 똑같이 처리**한다. 방만 나가고 약속카드가 남는 일을 막는다 | `*_appointments.sql` `leave_room` |
+| 닫힌 채팅방 (PRD S15 구체화) | 방장이 약속을 취소한 방은 채팅 목록에서 사라지고 **서버에서 메시지 전송을 막는다** | `*_appointments.sql` |
+| 방장 취소 알림 (PRD S15, 16절) | 푸시가 정해지기 전까지 남은 참여자의 **약속카드 탭 배지**로 알린다 | `*_appointments.sql` `cancel_appointment` |
+| 만남 30분 전 알림 (PRD S15) | 필수 기능을 먼저 끝내기 위해 **뒤로 미룬다**. 그동안 S14 안내 문구에서 알림 문장을 뺀다 | `ConfirmAppointmentPopup.tsx` |
+| 메이트 없는 약속 확정 (PRD에 없음) | PRD에 금지 규칙이 없어 방장 혼자여도 확정할 수 있게 둔다 | `*_appointments.sql` `confirm_appointment` |
+| S14 시간 선택 | 새 패키지 없이 **`‹ ›` 버튼으로 날짜와 30분 단위 시간**을 고른다. 범위는 격자와 같은 `DAY_START`~`DAY_END` | `ConfirmAppointmentPopup.tsx` |
+

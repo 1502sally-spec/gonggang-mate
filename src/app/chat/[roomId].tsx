@@ -4,7 +4,7 @@
  * 10/31 회의 추가: 방장에게 입장 요청 수락/거절, 약속 확정 시 대기 중인 요청은 자동 거절 (최대 20명).
  */
 import { router, useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 
 import { Button } from '@/components/Button';
 import { ConfirmAppointmentPopup } from '@/components/popups/ConfirmAppointmentPopup';
@@ -15,6 +15,7 @@ export default function ChatRoomScreen() {
   const { roomId } = useLocalSearchParams<{ roomId: string }>();
   const [mateId, setMateId] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const closeConfirm = useCallback(() => setConfirmOpen(false), []);
 
   return (
     <ScreenPlaceholder id="S12" title="채팅방" description={`방 번호: ${roomId}`}>
@@ -29,8 +30,9 @@ export default function ChatRoomScreen() {
       <MateInfoPopup userId={mateId} onClose={() => setMateId(null)} />
       <ConfirmAppointmentPopup
         visible={confirmOpen}
-        onClose={() => setConfirmOpen(false)}
-        onConfirm={() => {
+        roomId={roomId}
+        onClose={closeConfirm}
+        onConfirmed={() => {
           setConfirmOpen(false);
           router.push('/appointments');
         }}
