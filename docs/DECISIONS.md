@@ -33,3 +33,14 @@ PRD와 다르게 정한 것, PRD의 `[결정 필요]` 항목을 정한 결과를
   - 색상·글자 크기·간격은 `theme.ts` 값만 쓴다.
   - 버튼·아바타 등은 공통 부품(`src/components`)을 쓴다. 부품 모양을 바꾸면 모든 화면에 한 번에 반영된다.
   - 화면 파일 안에서 데이터 처리(불러오기, 저장)와 화면 그리기를 섞지 않는다. 데이터는 `src/api/` 함수로 받는다.
+
+## 2026-11-02 결정
+
+| 항목 | 결정 | 코드 위치 |
+|---|---|---|
+| 혼자 지도 구현 방식 (PRD 3장 지도·S09 변경) | **기본 지도 `react-native-maps`** (iPhone: Apple 지도, Android: Google 지도). 네이버 지도 API·키는 쓰지 않는다. Expo Go에서 바로 동작 | `src/components/map/PlaceMap.tsx` |
+| 장소 상세 | S10 팝업의 **'네이버 지도에서 보기'** 버튼으로 장소별 네이버 지도 링크(`places.naver_map_url`)를 연다 | `src/components/popups/PlacePopup.tsx` |
+| 지도 기본 위치 | 중앙대 서울캠퍼스. 위치 권한을 허용하면 내 위치도 표시, 거부해도 학교 중심 지도 | `config.ts` `SCHOOL_CENTER` |
+| 장소 데이터 | 담당자가 11/2 안에 전달 → C가 `places` 테이블에 입력 | |
+| 웹 브라우저 | `react-native-maps`가 웹을 지원하지 않아, 브라우저에서는 장소 목록으로 대신 보여 준다 (개발 확인용) | `PlaceMap.web.tsx` |
+

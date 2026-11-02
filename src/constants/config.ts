@@ -19,6 +19,11 @@ export const NICKNAME_MIN_LENGTH = 2;
 export const NICKNAME_MAX_LENGTH = 10;
 export const BIO_MAX_LENGTH = 40;
 
+// ── 혼자 지도 (PRD S09, 11/2 결정: 기본 지도 react-native-maps) ──
+// 지도 기본 위치: 중앙대 서울캠퍼스. 위치 권한을 거부해도 이 위치로 지도를 보여 준다
+export const SCHOOL_CENTER = { latitude: 37.5048, longitude: 126.9575 };
+export const SCHOOL_MAP_DELTA = 0.008; // 지도에 보이는 범위 (작을수록 확대)
+
 // ── 게시물 (PRD S08) ──
 export const POST_TITLE_MAX = 30;
 export const POST_CONTENT_MAX = 500;
