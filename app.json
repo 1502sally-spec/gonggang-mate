@@ -33,7 +33,13 @@
           "imageWidth": 76
         }
       ],
-      "expo-sqlite"
+      "expo-sqlite",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "혼자 지도에서 내 위치를 보여 주기 위해 위치 정보를 사용해요."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
