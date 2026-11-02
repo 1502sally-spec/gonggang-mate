@@ -49,7 +49,7 @@ try {
 ## 가짜 데이터 ↔ 실제 서버 전환
 
 `.env`의 `EXPO_PUBLIC_USE_MOCK_API`로 고른다. 값이 없거나 `true`면 가짜 데이터, `false`면 Supabase로 바꾼 함수가 실제 서버를 쓴다.
-지금 Supabase로 바뀐 파일: `auth`, `users`(`getMateInfo` 제외), `freeSlots`, `posts`. 나머지는 아직 가짜 데이터.
+지금 Supabase로 바뀐 파일: `auth`, `users`(`getMateInfo` 제외), `freeSlots`, `posts`, `rooms`, `messages`, `places`. 나머지는 아직 가짜 데이터.
 가짜 코드는 `mock/`에 그대로 있다.
 
 ## C(DB 담당)가 할 일
