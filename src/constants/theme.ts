@@ -28,6 +28,15 @@ export const categoryInfo: Record<Category, { label: string; accent: string; bac
   walk: { label: '산책', accent: '#2F7A3E', background: '#E6F5EA' },
 };
 
+/** 혼자 지도 장소 분류 (11/2 결정). 핀·칩 색 */
+export const PLACE_CATEGORIES = ['meal', 'cafe', 'entertainment'] as const;
+
+export const placeCategoryInfo: Record<(typeof PLACE_CATEGORIES)[number], { label: string; accent: string; background: string }> = {
+  meal: { label: '식당', accent: '#D9480F', background: '#FFF0E6' },
+  cafe: { label: '카페', accent: '#8B5E3C', background: '#F5EDE6' },
+  entertainment: { label: '엔터테인먼트', accent: '#7048E8', background: '#F0EBFF' },
+};
+
 /** 글자 크기 (PRD 4.2) */
 export const fontSize = {
   title: 22, // 화면 제목 (굵기 900)

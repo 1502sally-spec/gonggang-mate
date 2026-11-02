@@ -1,6 +1,7 @@
 /**
  * S09 혼자 — 담당: A
- * PRD: 제목 "혼자", 카테고리 박스 2개(식사/카페) 중 하나만 선택(기본 식사).
+ * PRD: 제목 "혼자", 카테고리 중 하나만 선택(기본 식당).
+ * 11/2 결정: 카테고리는 식당·카페·엔터테인먼트 3개 (PRD의 식사/카페 2개에서 변경).
  * 아래에 지도. 학교 주변을 기본 위치로, 위치 권한을 허용하면 내 위치도 표시.
  * 선택한 카테고리의 장소만 핀으로 표시(카테고리 색 핀 + 가게 이름 라벨). 핀을 누르면 S10 팝업.
  * - [AC] 카테고리를 바꾸면 핀이 즉시 바뀐다
@@ -16,18 +17,14 @@ import { api, ApiError, type Place } from '@/api';
 import { Button } from '@/components/Button';
 import { PlaceMap } from '@/components/map/PlaceMap';
 import { PlacePopup } from '@/components/popups/PlacePopup';
-import { categoryInfo, colors, fontSize, MIN_TOUCH, spacing } from '@/constants/theme';
+import { colors, fontSize, MIN_TOUCH, PLACE_CATEGORIES, placeCategoryInfo, spacing } from '@/constants/theme';
+import type { PlaceCategory } from '@/types/db';
 
-type SoloCategory = 'meal' | 'cafe';
-const SOLO_CATEGORIES: { key: SoloCategory; label: string }[] = [
-  { key: 'meal', label: '혼밥' },
-  { key: 'cafe', label: '혼카페' },
-];
 
 export default function SoloScreen() {
-  const [category, setCategory] = useState<SoloCategory>('meal');
-  // 두 카테고리를 한 번에 불러 두고, 바꿀 때는 바로 핀만 바꾼다
-  const [places, setPlaces] = useState<Record<SoloCategory, Place[]> | null>(null);
+  const [category, setCategory] = useState<PlaceCategory>('meal');
+  // 모든 카테고리를 한 번에 불러 두고, 바꿀 때는 바로 핀만 바꾼다
+  const [places, setPlaces] = useState<Record<PlaceCategory, Place[]> | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<Place | null>(null);
   const [locationGranted, setLocationGranted] = useState(false);
@@ -35,10 +32,10 @@ export default function SoloScreen() {
 
   useEffect(() => {
     let active = true;
-    Promise.all([api.places.getPlaces('meal'), api.places.getPlaces('cafe')])
-      .then(([meal, cafe]) => {
+    Promise.all(PLACE_CATEGORIES.map((c) => api.places.getPlaces(c)))
+      .then(([meal, cafe, entertainment]) => {
         if (!active) return;
-        setPlaces({ meal, cafe });
+        setPlaces({ meal, cafe, entertainment });
         setError(null);
       })
       .catch((e) => {
@@ -56,7 +53,7 @@ export default function SoloScreen() {
       .catch(() => setLocationGranted(false));
   }, []);
 
-  const info = categoryInfo[category];
+  const info = placeCategoryInfo[category];
   const current = places?.[category] ?? [];
 
   return (
@@ -65,9 +62,9 @@ export default function SoloScreen() {
         혼자
       </Text>
       <View style={styles.tabs} accessibilityRole="tablist">
-        {SOLO_CATEGORIES.map(({ key, label }) => {
+        {PLACE_CATEGORIES.map((key) => {
           const on = key === category;
-          const c = categoryInfo[key];
+          const c = placeCategoryInfo[key];
           return (
             <Pressable
               key={key}
@@ -79,7 +76,9 @@ export default function SoloScreen() {
               }}
               style={[styles.tab, on && { backgroundColor: c.background, borderColor: c.accent }]}
             >
-              <Text style={[styles.tabText, on && { color: c.accent, fontWeight: '900' }]}>{label}</Text>
+              <Text style={[styles.tabText, on && { color: c.accent, fontWeight: '900' }]} numberOfLines={1}>
+                {c.label}
+              </Text>
             </Pressable>
           );
         })}

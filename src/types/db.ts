@@ -174,10 +174,13 @@ export interface GameResultPayload {
   result: Record<string, unknown>;
 }
 
+/** 혼자 지도 장소 분류 (11/2 결정: 식당·카페·엔터테인먼트). 게시판 카테고리(식사·카페·공부·산책)와 별개 */
+export type PlaceCategory = 'meal' | 'cafe' | 'entertainment';
+
 /** 혼자 지도 장소 (PRD S09) */
 export interface Place {
   id: string;
-  category: 'meal' | 'cafe';
+  category: PlaceCategory;
   name: string;
   address: string;
   lat: number;
