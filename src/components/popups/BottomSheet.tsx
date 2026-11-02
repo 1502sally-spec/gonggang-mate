@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { colors, spacing } from '@/constants/theme';
 
@@ -14,18 +14,22 @@ type Props = {
 export function BottomSheet({ visible, onClose, title, children }: Props) {
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="닫기" />
-      <View style={styles.sheet}>
-        {title ? <Text style={styles.title}>{title}</Text> : null}
-        {children}
-      </View>
+      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="닫기" />
+        <View style={styles.sheet}>
+          {title ? <Text style={styles.title}>{title}</Text> : null}
+          {children}
+        </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
+  flex: { flex: 1 },
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.3)' },
   sheet: {
+    maxHeight: '85%',
     backgroundColor: colors.white,
     padding: spacing.lg,
     paddingBottom: spacing.lg * 2,
