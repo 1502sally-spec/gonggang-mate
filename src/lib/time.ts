@@ -71,6 +71,17 @@ function toKstParts(date: Date): { weekday: Weekday; minutes: number; dayStartUt
   return { weekday, minutes, dayStartUtcMs };
 }
 
+/** 한국 시간 기준 0시부터 지난 분. 예: 12:30 → 750 */
+export function kstMinutesOfDay(at: Timestamp): number {
+  return toKstParts(new Date(at)).minutes;
+}
+
+/** '11월 2일 (월)' */
+export function formatDate(at: Timestamp): string {
+  const kst = new Date(new Date(at).getTime() + KST_OFFSET_MS);
+  return `${kst.getUTCMonth() + 1}월 ${kst.getUTCDate()}일 (${WEEKDAY_LABELS[toKstParts(new Date(at)).weekday]})`;
+}
+
 /**
  * 게시물 약속 날짜 계산 (PRD S08)
  * 선택한 요일의 가장 가까운 다가오는 날짜. 오늘이 그 요일이고 시작 시각이 안 지났으면 오늘, 지났으면 다음 주.
