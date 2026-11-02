@@ -167,6 +167,7 @@ function seed() {
   const places: Place[] = [
     { id: 'pl-1', category: 'meal', name: '학생식당', address: '서울 동작구 흑석로 84 (교내)', lat: 37.5052, lng: 126.9571, naver_map_url: 'https://map.naver.com', is_active: true },
     { id: 'pl-2', category: 'meal', name: '예시 덮밥집 (1인석)', address: '정문 앞', lat: 37.5065, lng: 126.958, naver_map_url: 'https://map.naver.com', is_active: true },
+    { id: 'pl-4', category: 'entertainment', name: '예시 코인노래방', address: '정문 앞', lat: 37.5062, lng: 126.959, naver_map_url: 'https://map.naver.com', is_active: true },
     { id: 'pl-3', category: 'cafe', name: '예시 카페 (콘센트 많음)', address: '정문 앞', lat: 37.5068, lng: 126.9585, naver_map_url: 'https://map.naver.com', is_active: true },
   ];
 

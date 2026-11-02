@@ -42,5 +42,6 @@ PRD와 다르게 정한 것, PRD의 `[결정 필요]` 항목을 정한 결과를
 | 장소 상세 | S10 팝업의 **'네이버 지도에서 보기'** 버튼으로 장소별 네이버 지도 링크(`places.naver_map_url`)를 연다 | `src/components/popups/PlacePopup.tsx` |
 | 지도 기본 위치 | 중앙대 서울캠퍼스. 위치 권한을 허용하면 내 위치도 표시, 거부해도 학교 중심 지도 | `config.ts` `SCHOOL_CENTER` |
 | 장소 데이터 | 담당자가 11/2 안에 전달 → C가 `places` 테이블에 입력 | |
+| 혼자 지도 카테고리 (PRD S09 변경) | 식사·카페 2개 → **식당·카페·엔터테인먼트 3개** (`meal`·`cafe`·`entertainment`). 게시판 카테고리(식사·카페·공부·산책)와는 별개 | `theme.ts` `placeCategoryInfo`, `db.ts` `PlaceCategory` |
 | 웹 브라우저 | `react-native-maps`가 웹을 지원하지 않아, 브라우저에서는 장소 목록으로 대신 보여 준다 (개발 확인용) | `PlaceMap.web.tsx` |
 

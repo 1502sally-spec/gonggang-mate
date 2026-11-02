@@ -9,7 +9,7 @@ import { Alert, Linking, Pressable, StyleSheet, Text, View } from 'react-native'
 import type { Place } from '@/api';
 import { Button } from '@/components/Button';
 import { BottomSheet } from '@/components/popups/BottomSheet';
-import { categoryInfo, colors, fontSize, MIN_TOUCH, spacing } from '@/constants/theme';
+import { colors, fontSize, MIN_TOUCH, placeCategoryInfo, spacing } from '@/constants/theme';
 
 type Props = {
   place: Place | null;
@@ -17,7 +17,7 @@ type Props = {
 };
 
 export function PlacePopup({ place, onClose }: Props) {
-  const info = place ? categoryInfo[place.category] : null;
+  const info = place ? placeCategoryInfo[place.category] : null;
 
   const openNaverMap = async () => {
     if (!place?.naver_map_url) return;
