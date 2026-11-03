@@ -13,6 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { api, ApiError } from '@/api';
 import { Button } from '@/components/Button';
 import { TimeGrid, type TimeRange } from '@/components/TimeGrid';
+import { WEEKDAY_COUNT } from '@/constants/config';
 import { colors, fontSize, radius, spacing } from '@/constants/theme';
 import { formatDuration, totalMinutes, WEEKDAY_LABELS } from '@/lib/time';
 
@@ -25,7 +26,8 @@ export default function FreeTimeScreen() {
   useEffect(() => {
     api.freeSlots
       .getMyFreeRanges()
-      .then(setRanges)
+      // 월~금만 다룬다 (11/3 결정). 예전에 저장된 주말 공강은 보이지 않고, 저장하면 빠진다
+      .then((list) => setRanges(list.filter((r) => r.weekday < WEEKDAY_COUNT)))
       .catch((e) => Alert.alert(e instanceof ApiError ? e.message : '공강을 불러오지 못했어요'))
       .finally(() => setLoading(false));
   }, []);
@@ -119,12 +121,12 @@ export default function FreeTimeScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
-  head: { paddingHorizontal: spacing.lg - 4, paddingTop: spacing.lg, gap: spacing.sm },
+  head: { paddingHorizontal: spacing.lg - 4, paddingTop: spacing.md, gap: spacing.sm },
   title: { color: colors.primary, fontSize: fontSize.title + 2, fontWeight: '900' },
   guideBox: { padding: spacing.md - 4, borderRadius: radius.control, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.white },
-  guide: { color: colors.sub, fontSize: fontSize.caption + 1, lineHeight: 19 },
+  guide: { color: colors.sub, fontSize: fontSize.caption, lineHeight: 17 },
   guideStrong: { color: colors.primary, fontWeight: '800' },
-  gridArea: { flex: 1, marginTop: spacing.md, marginHorizontal: spacing.sm },
+  gridArea: { flex: 1, marginTop: spacing.sm, marginHorizontal: spacing.sm },
   loading: { marginTop: spacing.lg },
   bottom: { paddingHorizontal: spacing.lg - 4, paddingTop: spacing.sm, paddingBottom: spacing.sm, gap: spacing.sm },
   listCard: {
@@ -139,7 +141,7 @@ const styles = StyleSheet.create({
   listTitle: { color: colors.primary, fontSize: fontSize.body - 1, fontWeight: '800' },
   total: { color: colors.primaryBright, fontSize: fontSize.caption + 1, fontWeight: '700' },
   empty: { color: colors.sub, fontSize: fontSize.caption + 1 },
-  list: { maxHeight: 96 },
+  list: { maxHeight: 76 },
   listContent: { gap: spacing.xs },
   row: {
     flexDirection: 'row',
