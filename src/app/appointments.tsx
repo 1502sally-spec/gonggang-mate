@@ -2,17 +2,19 @@
  * S15 약속카드 — 담당: C
  * PRD: 다가오는 약속('약속 취소' 버튼, 확인 팝업) / 지난 약속('후기작성' → S17).
  * 11/3 추가: '일정 변경'(방장만, 시작 전 → 약속 확정 팝업을 변경 모드로), '완료 및 후기'(약속 시작 이후 → S17).
- * 탭 숫자 배지는 (tabs)/_layout.tsx. 만남 30분 전 알림은 아직 없다 (api/appointments.ts TODO).
+ * 11/3 결정: 하단 탭에서 빠지고 홈 약속카드 영역 → '전체 보기'로 들어온다(뒤로가기 있음). 이 화면을 열면 확인 안 한 약속 배지를 없앤다.
+ * 만남 30분 전 알림은 아직 없다 (api/appointments.ts TODO).
  * 디자인은 나중에 피그마 반영 예정 (지금은 기능 위주).
  */
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, RefreshControl, SectionList, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, RefreshControl, SectionList, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { api, ApiError, type AppointmentItem, type MyAppointments } from '@/api';
 import { Avatar } from '@/components/Avatar';
 import { Button } from '@/components/Button';
+import { Icon } from '@/components/Icon';
 import { ConfirmAppointmentPopup } from '@/components/popups/ConfirmAppointmentPopup';
 import { categoryInfo, colors, fontSize, spacing } from '@/constants/theme';
 import { formatDateRange, formatTimeLeft } from '@/lib/time';
@@ -39,6 +41,7 @@ export default function AppointmentsScreen() {
   useFocusEffect(
     useCallback(() => {
       load();
+      api.appointments.markAppointmentsSeen().catch(() => {}); // 홈 약속카드 배지 없애기
     }, [load]),
   );
 
@@ -76,7 +79,7 @@ export default function AppointmentsScreen() {
   if (!appointments) {
     return (
       <SafeAreaView style={styles.safe} edges={['top']}>
-        <Text style={styles.title}>약속카드</Text>
+        <Header />
         <ActivityIndicator color={colors.primary} style={styles.loading} />
       </SafeAreaView>
     );
@@ -89,7 +92,7 @@ export default function AppointmentsScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      <Text style={styles.title}>약속카드</Text>
+      <Header />
       <SectionList
         sections={sections}
         keyExtractor={(item) => item.id}
@@ -113,6 +116,18 @@ export default function AppointmentsScreen() {
         }}
       />
     </SafeAreaView>
+  );
+}
+
+/** 탭에서 빠졌으므로 뒤로가기가 있는 상단 (11/3 결정) */
+function Header() {
+  return (
+    <View style={styles.header}>
+      <Pressable accessibilityRole="button" accessibilityLabel="뒤로가기" onPress={() => router.back()} style={styles.back} hitSlop={8}>
+        <Icon name="arrow-left" size={24} color={colors.ink} />
+      </Pressable>
+      <Text style={styles.title}>약속카드</Text>
+    </View>
   );
 }
 
@@ -177,6 +192,8 @@ function AppointmentCard({
 }
 
 const styles = StyleSheet.create({
+  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.xs },
+  back: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   safe: { flex: 1, backgroundColor: colors.bg },
   title: { color: colors.ink, fontSize: fontSize.title, fontWeight: '900', paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
   loading: { marginTop: spacing.lg },

@@ -1,40 +1,49 @@
 /**
- * S05 메인 — 담당: A
- * PRD
- * - 상단: 로고, 오른쪽 톱니바퀴(→ S04 설정)
- * - 내 공강시간 박스: 요일(월~일)별 미니 막대로 공강 위치 표시 + 공강 구간 칩 목록(예: 월 12:00-13:00)
- *   '내 공강시간 설정' 버튼 → S06. 공강이 없으면 "공강시간을 설정하면 맞는 메이트 글이 보여요" + 버튼 강조
- * - 카테고리 박스 4개(2×2): 식사·카페·공부·산책 → S07. 각 박스에 내게 보이는 글 수
- * - [AC] S06에서 저장한 공강이 바로 반영된다 (화면에 돌아올 때마다 다시 불러옴)
- * - [AC] 연속된 공강 칸은 하나의 구간으로 합쳐 표시한다 (api가 합친 구간을 돌려줌)
- * 디자인은 나중에 피그마 반영 예정 (지금은 기능 위주).
+ * S05 메인 — 담당: A (디자인팀 UI 반영)
+ * - 인사말 + 톱니바퀴(→ S04 설정)
+ * - 오늘의 공강 시간 카드 (11/3 결정 4번): 오늘 요일의 공강 구간, '수정' → S06. 주말이거나 공강이 없으면 안내
+ * - 무엇을 함께할까요? 카테고리 2×2 (→ S07). 내게 보이는 글이 있으면 개수 표시 (PRD S05)
+ * - 약속카드 영역 (11/3 결정 5번: 하단 탭 대신 홈에서 진입): 가장 가까운 약속, 확인 안 한 약속 배지, '전체 보기' → S15
+ * - 화면에 돌아올 때마다 다시 불러온다 (S06 저장, 약속 확정·변경이 바로 반영)
  */
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { api, ApiError } from '@/api';
+import { api, ApiError, type AppointmentItem } from '@/api';
 import { Button } from '@/components/Button';
-import { DAY_END, DAY_START } from '@/constants/config';
-import { CATEGORIES, categoryInfo, colors, fontSize, MIN_TOUCH, spacing, type Category } from '@/constants/theme';
-import { formatRange, timeToMinutes, WEEKDAY_LABELS } from '@/lib/time';
+import { Icon, type IconName } from '@/components/Icon';
+import { WEEKDAY_COUNT } from '@/constants/config';
+import { CATEGORIES, categoryInfo, colors, fontSize, radius, spacing, type Category } from '@/constants/theme';
+import { formatDateRange, formatTimeLeft, kstWeekday, WEEKDAY_LABELS } from '@/lib/time';
 import type { TimeRange } from '@/types/db';
+
+/** 카테고리 박스 아이콘과 부제 (디자인팀 UI) */
+const CATEGORY_UI: Record<Category, { icon: IconName; caption: string }> = {
+  meal: { icon: 'utensils', caption: '함께 먹기' },
+  cafe: { icon: 'coffee', caption: '수다 한 잔' },
+  study: { icon: 'book-open', caption: '같이 집중' },
+  walk: { icon: 'map', caption: '캠퍼스 한 바퀴' },
+};
 
 type HomeData = {
   nickname: string;
   ranges: TimeRange[];
-  counts: Record<Category, number> | null; // 글 수를 못 불러와도 나머지는 보여 준다
+  counts: Record<Category, number> | null; // 보조 정보라 실패해도 나머지는 보여 준다
+  nextAppointment: AppointmentItem | null;
+  unseen: number;
 };
-
-const BAR_HEIGHT = 72;
-const DAY_START_MIN = timeToMinutes(DAY_START);
-const DAY_LENGTH_MIN = timeToMinutes(DAY_END) - DAY_START_MIN;
 
 async function loadHome(): Promise<HomeData> {
   const [me, ranges] = await Promise.all([api.users.getMe(), api.freeSlots.getMyFreeRanges()]);
-  const counts = await api.posts.getMatchingCounts().catch(() => null);
-  return { nickname: me.nickname, ranges, counts };
+  const [counts, appointments, unseen] = await Promise.all([
+    api.posts.getMatchingCounts().catch(() => null),
+    api.appointments.getMyAppointments().catch(() => null),
+    api.appointments.getUnseenAppointmentCount().catch(() => 0),
+  ]);
+  const nextAppointment = appointments?.upcoming.find((a) => a.status !== 'canceled') ?? null;
+  return { nickname: me.nickname, ranges, counts, nextAppointment, unseen };
 }
 
 export default function HomeScreen() {
@@ -42,7 +51,6 @@ export default function HomeScreen() {
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
-  // 화면에 들어올 때마다(S06·S04에서 돌아올 때 포함) 다시 불러온다
   useFocusEffect(
     useCallback(() => {
       let active = true;
@@ -73,157 +81,225 @@ export default function HomeScreen() {
     }
   };
 
-  const hasFreeTime = (data?.ranges.length ?? 0) > 0;
+  if (!data && !error) {
+    return (
+      <SafeAreaView style={styles.safe} edges={['top']}>
+        <ActivityIndicator style={styles.loading} color={colors.primary} accessibilityLabel="불러오는 중" />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      <View style={styles.topBar}>
-        <Text style={styles.logo} accessibilityRole="header">
-          공강메이트
-        </Text>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="설정"
-          onPress={() => router.push('/settings')}
-          style={styles.gear}
-          hitSlop={8}
-        >
-          <Text style={styles.gearText}>⚙︎</Text>
-        </Pressable>
-      </View>
+      <ScrollView contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
+        <View style={styles.header}>
+          <View style={styles.flex}>
+            <Text style={styles.greeting} accessibilityRole="header">
+              안녕하세요, {data?.nickname ?? ''}님!
+            </Text>
+            <Text style={styles.subGreeting}>오늘도 좋은 공강 시간 보내세요</Text>
+          </View>
+          <Pressable accessibilityRole="button" accessibilityLabel="설정" onPress={() => router.push('/settings')} style={styles.gear} hitSlop={6}>
+            <Icon name="settings" size={22} color={colors.primary} />
+          </Pressable>
+        </View>
 
-      {!data && !error ? (
-        <ActivityIndicator style={styles.loading} color={colors.primary} accessibilityLabel="불러오는 중" />
-      ) : (
-        <ScrollView
-          contentContainerStyle={styles.content}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-        >
-          {error ? (
-            <View style={styles.errorBox}>
-              <Text style={styles.errorText}>{error}</Text>
-              <Button label="다시 시도" variant="secondary" onPress={onRefresh} />
-            </View>
-          ) : null}
+        {error ? (
+          <View style={styles.errorBox}>
+            <Text style={styles.errorText}>{error}</Text>
+            <Button label="다시 시도" variant="secondary" size="sm" onPress={onRefresh} />
+          </View>
+        ) : null}
 
-          {data ? (
-            <>
-              <Text style={styles.greeting}>안녕하세요, {data.nickname}님!</Text>
+        {data ? (
+          <>
+            <TodayCard ranges={data.ranges} />
 
-              {/* 내 공강시간 박스 */}
-              <View style={styles.card}>
-                <Text style={styles.cardTitle}>내 공강시간</Text>
-                <FreeTimeBars ranges={data.ranges} />
-                {hasFreeTime ? (
-                  <View style={styles.chips}>
-                    {data.ranges.map((r) => (
-                      <View key={`${r.weekday}-${r.start}`} style={styles.chip}>
-                        <Text style={styles.chipText}>{formatRange(r)}</Text>
+            <Text style={styles.sectionTitle}>무엇을 함께할까요?</Text>
+            <View style={styles.grid}>
+              {CATEGORIES.map((category) => {
+                const ui = CATEGORY_UI[category];
+                const label = categoryInfo[category].label;
+                const count = data.counts?.[category] ?? 0;
+                return (
+                  <Pressable
+                    key={category}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${label}, ${ui.caption}${count > 0 ? `, 내게 보이는 글 ${count}개` : ''}`}
+                    onPress={() => router.push({ pathname: '/board/[category]', params: { category } })}
+                    style={({ pressed }) => [styles.categoryBox, pressed && styles.pressed]}
+                  >
+                    <View style={styles.categoryTop}>
+                      <View style={styles.iconCircle}>
+                        <Icon name={ui.icon} size={20} color={colors.primary} />
                       </View>
-                    ))}
-                  </View>
-                ) : (
-                  <Text style={styles.emptyText}>공강시간을 설정하면 맞는 메이트 글이 보여요</Text>
-                )}
-                <Button
-                  label="내 공강시간 설정"
-                  variant={hasFreeTime ? 'secondary' : 'primary'}
-                  onPress={() => router.push('/free-time')}
-                />
-              </View>
+                      {count > 0 ? (
+                        <View style={styles.countPill}>
+                          <Text style={styles.countText}>글 {count}</Text>
+                        </View>
+                      ) : null}
+                    </View>
+                    <Text style={styles.categoryLabel}>
+                      {label} / {ui.caption}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
 
-              {/* 카테고리 2×2 */}
-              <Text style={styles.sectionTitle}>무엇을 함께할까요?</Text>
-              <View style={styles.grid}>
-                {CATEGORIES.map((category) => {
-                  const info = categoryInfo[category];
-                  const count = data.counts?.[category];
-                  return (
-                    <Pressable
-                      key={category}
-                      accessibilityRole="button"
-                      accessibilityLabel={`${info.label}${count !== undefined ? `, 보이는 글 ${count}개` : ''}`}
-                      onPress={() => router.push({ pathname: '/board/[category]', params: { category } })}
-                      style={({ pressed }) => [styles.categoryBox, { backgroundColor: info.background }, pressed && styles.pressed]}
-                    >
-                      <Text style={[styles.categoryLabel, { color: info.accent }]}>{info.label}</Text>
-                      <Text style={styles.categoryCount}>
-                        {count === undefined ? '글 수를 불러오지 못했어요' : count > 0 ? `내게 보이는 글 ${count}개` : '아직 맞는 글이 없어요'}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            </>
-          ) : null}
-        </ScrollView>
-      )}
+            <AppointmentSection next={data.nextAppointment} unseen={data.unseen} />
+          </>
+        ) : null}
+      </ScrollView>
     </SafeAreaView>
   );
 }
 
-/** 요일별 미니 막대: 위가 DAY_START, 아래가 DAY_END. 칠한 부분이 공강 */
-function FreeTimeBars({ ranges }: { ranges: TimeRange[] }) {
+/** 오늘의 공강 시간 (보라 카드) */
+function TodayCard({ ranges }: { ranges: TimeRange[] }) {
+  const today = kstWeekday();
+  const isWeekday = today < WEEKDAY_COUNT;
+  const todayRanges = ranges.filter((r) => r.weekday === today);
+
   return (
-    <View style={styles.bars} accessible accessibilityLabel={ranges.length ? `공강 ${ranges.map(formatRange).join(', ')}` : '공강 없음'}>
-      {WEEKDAY_LABELS.map((day, weekday) => (
-        <View key={day} style={styles.barCol}>
-          <View style={styles.bar}>
-            {ranges
-              .filter((r) => r.weekday === weekday)
-              .map((r) => {
-                const top = ((timeToMinutes(r.start) - DAY_START_MIN) / DAY_LENGTH_MIN) * BAR_HEIGHT;
-                const height = ((timeToMinutes(r.end) - timeToMinutes(r.start)) / DAY_LENGTH_MIN) * BAR_HEIGHT;
-                return <View key={r.start} style={[styles.barFill, { top, height: Math.max(2, height) }]} />;
-              })}
-          </View>
-          <Text style={styles.barLabel}>{day}</Text>
+    <View style={styles.todayCard}>
+      <View style={styles.todayHead}>
+        <Text style={styles.todayTitle}>
+          오늘의 공강 시간 <Text style={styles.todayDay}>· {WEEKDAY_LABELS[today]}요일</Text>
+        </Text>
+        <Pressable accessibilityRole="button" accessibilityLabel="공강 시간 수정" onPress={() => router.push('/free-time')} style={styles.editChip} hitSlop={8}>
+          <Text style={styles.editChipText}>수정</Text>
+        </Pressable>
+      </View>
+      {!isWeekday ? (
+        <Text style={styles.todayEmpty}>오늘은 주말이에요.{'\n'}평일 공강을 미리 입력해 보세요.</Text>
+      ) : todayRanges.length === 0 ? (
+        <Text style={styles.todayEmpty}>
+          {ranges.length === 0 ? '공강 시간을\n입력해 주세요.' : '오늘은 공강이 없어요.'}
+        </Text>
+      ) : (
+        <View style={styles.todayList}>
+          {todayRanges.map((r) => (
+            <Text key={r.start} style={styles.todayRange}>
+              {r.start} ~ {r.end}
+            </Text>
+          ))}
         </View>
-      ))}
+      )}
+    </View>
+  );
+}
+
+/** 약속카드 영역: 가장 가까운 약속 + 확인 안 한 약속 배지 + 전체 보기 */
+function AppointmentSection({ next, unseen }: { next: AppointmentItem | null; unseen: number }) {
+  return (
+    <View style={styles.apptCard}>
+      <View style={styles.apptHead}>
+        <View style={styles.apptTitleRow}>
+          <Text style={styles.apptTitle}>약속카드</Text>
+          {unseen > 0 ? (
+            <View style={styles.badge} accessibilityLabel={`확인 안 한 약속 ${unseen}개`}>
+              <Text style={styles.badgeText}>{unseen}</Text>
+            </View>
+          ) : null}
+        </View>
+        <Pressable accessibilityRole="button" accessibilityLabel="약속카드 전체 보기" onPress={() => router.push('/appointments')} style={styles.more} hitSlop={8}>
+          <Text style={styles.moreText}>전체 보기</Text>
+          <Icon name="chevron-right" size={16} color={colors.primary} />
+        </Pressable>
+      </View>
+      {next ? (
+        <Pressable accessibilityRole="button" onPress={() => router.push('/appointments')} style={styles.apptInner}>
+          <View style={styles.apptInnerTop}>
+            <Text style={styles.apptName} numberOfLines={1}>
+              {next.title}
+            </Text>
+            <Text style={styles.apptLeft}>{formatTimeLeft(next.start_at)}</Text>
+          </View>
+          <View style={styles.apptLine}>
+            <Icon name="clock" size={15} color={colors.primary} />
+            <Text style={styles.apptText}>{formatDateRange(next.start_at, next.end_at)}</Text>
+          </View>
+          <View style={styles.apptLine}>
+            <Icon name="map-pin" size={15} color={colors.primary} />
+            <Text style={styles.apptText} numberOfLines={1}>
+              {next.place}
+            </Text>
+          </View>
+        </Pressable>
+      ) : (
+        <View style={styles.apptEmpty}>
+          <Text style={styles.apptEmptyTitle}>만남을 기다리고 있어요!</Text>
+          <Text style={styles.apptEmptyText}>입력한 공강 시간에 맞는 약속이 생기면 여기서 확인할 수 있어요.</Text>
+        </View>
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
-  topBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingLeft: spacing.lg,
-    paddingRight: spacing.sm,
-    minHeight: MIN_TOUCH + 8,
-  },
-  logo: { color: colors.primary, fontSize: 20, fontWeight: '900' },
-  gear: { width: MIN_TOUCH, height: MIN_TOUCH, alignItems: 'center', justifyContent: 'center' },
-  gearText: { fontSize: 24, color: colors.ink },
+  flex: { flex: 1 },
   loading: { marginTop: spacing.lg * 2 },
-  content: { padding: spacing.lg, paddingTop: spacing.sm, gap: spacing.md },
-  greeting: { color: colors.ink, fontSize: fontSize.title, fontWeight: '900' },
-  errorBox: { gap: spacing.sm, padding: spacing.md, borderRadius: 12, backgroundColor: colors.white },
+  content: { padding: spacing.lg - 4, paddingTop: spacing.lg, gap: spacing.md },
+  header: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
+  greeting: { color: colors.primary, fontSize: fontSize.title, fontWeight: '900' },
+  subGreeting: { color: colors.sub, fontSize: fontSize.body - 1, marginTop: 2 },
+  gear: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  errorBox: { gap: spacing.sm, padding: spacing.md, borderRadius: radius.card, backgroundColor: colors.white },
   errorText: { color: colors.danger, fontSize: fontSize.body },
-  card: { backgroundColor: colors.white, borderRadius: 16, padding: spacing.md, gap: spacing.md },
-  cardTitle: { color: colors.ink, fontSize: fontSize.body + 1, fontWeight: '700' },
-  bars: { flexDirection: 'row', gap: spacing.sm },
-  barCol: { flex: 1, alignItems: 'center', gap: spacing.xs },
-  bar: { width: '100%', maxWidth: 28, height: BAR_HEIGHT, borderRadius: 6, backgroundColor: colors.bg, overflow: 'hidden' },
-  barFill: { position: 'absolute', left: 0, right: 0, backgroundColor: colors.primary },
-  barLabel: { color: colors.sub, fontSize: fontSize.caption },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
-  chip: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, backgroundColor: colors.primaryTint },
-  chipText: { color: colors.primary, fontSize: fontSize.caption, fontWeight: '700', fontVariant: ['tabular-nums'] },
-  emptyText: { color: colors.sub, fontSize: fontSize.body },
-  sectionTitle: { color: colors.ink, fontSize: fontSize.body + 1, fontWeight: '700', marginTop: spacing.sm },
+  todayCard: { minHeight: 170, padding: spacing.md + 2, borderRadius: radius.card + 2, backgroundColor: colors.primary, gap: spacing.md },
+  todayHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  todayTitle: { color: colors.white, fontSize: fontSize.body + 1, fontWeight: '800' },
+  todayDay: { color: colors.primarySoft, fontWeight: '600' },
+  editChip: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.18)' },
+  editChipText: { color: colors.white, fontSize: fontSize.caption + 1, fontWeight: '800' },
+  todayEmpty: { color: colors.white, fontSize: 26, fontWeight: '900', lineHeight: 34 },
+  todayList: { gap: 4 },
+  todayRange: { color: colors.white, fontSize: 28, fontWeight: '900', fontVariant: ['tabular-nums'] },
+  sectionTitle: { color: colors.ink, fontSize: fontSize.body + 3, fontWeight: '800', marginTop: spacing.xs },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   categoryBox: {
-    flexBasis: '48%',
+    flexBasis: '47%',
     flexGrow: 1,
-    minHeight: 96,
-    borderRadius: 16,
-    padding: spacing.md,
-    justifyContent: 'space-between',
+    minHeight: 82,
+    gap: spacing.sm,
+    padding: spacing.md - 2,
+    borderRadius: radius.card - 2,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.white,
   },
-  pressed: { opacity: 0.8 },
-  categoryLabel: { fontSize: 20, fontWeight: '900' },
-  categoryCount: { color: colors.ink, fontSize: fontSize.caption },
+  pressed: { opacity: 0.85 },
+  categoryTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  iconCircle: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.primaryTint, alignItems: 'center', justifyContent: 'center' },
+  countPill: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: radius.pill, backgroundColor: colors.primaryTint },
+  countText: { color: colors.primary, fontSize: fontSize.caption, fontWeight: '800' },
+  categoryLabel: { color: colors.ink, fontSize: fontSize.body, fontWeight: '700' },
+  apptCard: { padding: spacing.md, borderRadius: radius.card, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.white, gap: spacing.sm },
+  apptHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  apptTitleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs + 2 },
+  apptTitle: { color: colors.ink, fontSize: fontSize.body + 1, fontWeight: '800' },
+  badge: { minWidth: 20, height: 20, paddingHorizontal: 6, borderRadius: 10, backgroundColor: colors.alert, alignItems: 'center', justifyContent: 'center' },
+  badgeText: { color: colors.white, fontSize: fontSize.caption, fontWeight: '800' },
+  more: { flexDirection: 'row', alignItems: 'center', minHeight: 32 },
+  moreText: { color: colors.primary, fontSize: fontSize.caption + 1, fontWeight: '700' },
+  apptInner: { padding: spacing.md - 2, borderRadius: radius.control, backgroundColor: colors.bg, gap: 6 },
+  apptInnerTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
+  apptName: { flex: 1, color: colors.primary, fontSize: fontSize.body, fontWeight: '800' },
+  apptLeft: { color: colors.primaryBright, fontSize: fontSize.caption + 1, fontWeight: '800' },
+  apptLine: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  apptText: { flex: 1, color: colors.ink, fontSize: fontSize.body - 1, fontVariant: ['tabular-nums'] },
+  apptEmpty: { paddingVertical: spacing.lg - 4, paddingHorizontal: spacing.md, borderRadius: radius.control, backgroundColor: colors.bg, alignItems: 'center', gap: 6 },
+  apptEmptyTitle: { color: colors.primary, fontSize: fontSize.body + 1, fontWeight: '800' },
+  apptEmptyText: { color: colors.sub, fontSize: fontSize.caption + 1, textAlign: 'center', lineHeight: 18 },
 });

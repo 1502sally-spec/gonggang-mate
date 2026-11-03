@@ -24,12 +24,12 @@ src/
     login.tsx                S02 로그인
     signup.tsx               S03 회원가입
     settings.tsx             S04 설정(프로필)
-    (tabs)/                  하단 네비가 있는 화면
+    (tabs)/                  하단 네비가 있는 화면 (혼자놀기 / 홈 / 채팅, 11/3 디자인 반영)
       solo.tsx               S09 혼자
       home.tsx               S05 메인
       chats.tsx              S11 채팅 목록
-      appointments.tsx       S15 약속카드
     free-time.tsx            S06 공강 설정
+    appointments.tsx         S15 약속카드 (홈의 약속카드 영역 → 전체 보기)
     board/[category].tsx     S07 카테고리 게시판 (식사/카페/공부/산책 공용)
     post/new.tsx             S08 게시물 작성
     chat/[roomId].tsx        S12 채팅방

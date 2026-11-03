@@ -30,8 +30,8 @@ import {
 } from 'react-native';
 import { GestureDetector, usePanGesture } from 'react-native-gesture-handler';
 
-import { DAY_END, DAY_START, SLOT_MINUTES } from '@/constants/config';
-import { colors, fontSize } from '@/constants/theme';
+import { DAY_END, DAY_START, SLOT_MINUTES, WEEKDAY_COUNT } from '@/constants/config';
+import { colors, fontSize, radius } from '@/constants/theme';
 import { minutesToTime, rangesToSlots, slotsToRanges, timeToMinutes, WEEKDAY_LABELS } from '@/lib/time';
 import type { TimeRange, Weekday } from '@/types/db';
 
@@ -46,11 +46,12 @@ export type TimeGridProps = {
   highlight?: TimeRange[];
 };
 
-const DAYS = 7;
+const DAYS = WEEKDAY_COUNT; // 월~금 (11/3 결정)
+const DAY_LABELS = WEEKDAY_LABELS.slice(0, DAYS);
 const MIN_ROW_HEIGHT = 16;
 const MAX_ROW_HEIGHT = 32;
-const HEADER_HEIGHT = 28;
-const TIME_COL_WIDTH = 44;
+const HEADER_HEIGHT = 40;
+const TIME_COL_WIDTH = 48;
 const LABEL_OFFSET = 7; // 시간 글자를 줄 위에 걸치게 올리는 정도
 const AUTO_SCROLL_EDGE = 32; // 스크롤 모드에서 위·아래 끝 몇 px 안에 손가락이 있으면 자동 스크롤
 const AUTO_SCROLL_STEP = 8;
@@ -69,7 +70,10 @@ const keyOf = (col: number, row: number) => `${col}-${ROW_TIMES[row]}`;
 
 function toKeySet(ranges: TimeRange[] | undefined): Set<string> {
   const set = new Set<string>();
-  rangesToSlots(ranges ?? []).forEach((s) => set.add(`${s.weekday}-${s.slot_start}`));
+  // 격자에 없는 요일(주말)은 버린다: 저장하면 월~금만 남는다
+  rangesToSlots(ranges ?? []).forEach((s) => {
+    if (s.weekday < DAYS) set.add(`${s.weekday}-${s.slot_start}`);
+  });
   return set;
 }
 
@@ -282,7 +286,7 @@ export function TimeGrid({ mode, value, onChange, highlight }: TimeGridProps) {
             const nextIsHour = ROW_TIMES[row + 1]?.endsWith(':00') ?? true;
             return (
               <View key={time} style={[styles.row, { height: rowHeight }]}>
-                {WEEKDAY_LABELS.map((day, col) => {
+                {DAY_LABELS.map((day, col) => {
                   const key = keyOf(col, row);
                   const isOn = selected.has(key);
                   const isHighlight = !isOn && highlightKeys.has(key);
@@ -315,11 +319,11 @@ export function TimeGrid({ mode, value, onChange, highlight }: TimeGridProps) {
     <View style={styles.root} onLayout={onLayout}>
       {/* 요일 머리글 */}
       <View style={[styles.header, { height: HEADER_HEIGHT }]}>
-        <View style={{ width: TIME_COL_WIDTH }} />
-        {WEEKDAY_LABELS.map((day) => (
-          <Text key={day} style={styles.dayLabel}>
-            {day}
-          </Text>
+        <Text style={styles.timeHead}>시간</Text>
+        {DAY_LABELS.map((day) => (
+          <View key={day} style={styles.dayCell}>
+            <Text style={styles.dayChip}>{day}</Text>
+          </View>
         ))}
       </View>
 
@@ -341,15 +345,27 @@ export function TimeGrid({ mode, value, onChange, highlight }: TimeGridProps) {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.white },
-  header: { flexDirection: 'row', alignItems: 'center' },
-  dayLabel: { flex: 1, textAlign: 'center', color: colors.ink, fontSize: fontSize.caption, fontWeight: '700' },
+  root: { flex: 1, backgroundColor: colors.bg },
+  header: { flexDirection: 'row', alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.line },
+  timeHead: { width: TIME_COL_WIDTH, color: colors.sub, fontSize: fontSize.caption, textAlign: 'center' },
+  dayCell: { flex: 1, alignItems: 'center' },
+  dayChip: {
+    minWidth: 36,
+    paddingVertical: 5,
+    borderRadius: radius.pill,
+    overflow: 'hidden',
+    backgroundColor: colors.primaryTint,
+    color: colors.primary,
+    fontSize: fontSize.caption + 1,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
   body: { flexDirection: 'row' },
   timeLabel: {
     position: 'absolute',
-    right: 6,
+    right: 8,
     color: colors.sub,
-    fontSize: 11,
+    fontSize: fontSize.caption,
     fontVariant: ['tabular-nums'],
   },
   cells: {
@@ -367,5 +383,5 @@ const styles = StyleSheet.create({
     borderRightColor: colors.line,
   },
   highlight: { backgroundColor: colors.primaryTint },
-  on: { backgroundColor: colors.primary },
+  on: { backgroundColor: colors.primaryBright, borderBottomColor: colors.primaryBright, borderRightColor: colors.primaryBright },
 });

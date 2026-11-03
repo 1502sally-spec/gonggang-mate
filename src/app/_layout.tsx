@@ -51,6 +51,7 @@ export default function RootLayout() {
         <Stack.Screen name="settings" />
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="free-time" />
+        <Stack.Screen name="appointments" />
         <Stack.Screen name="board/[category]" />
         {/* 모달을 아래로 끌어 닫는 동작이 TimeGrid 드래그와 겹치지 않게 끈다 (닫기는 X 버튼) */}
         <Stack.Screen name="post/new" options={{ presentation: 'modal', gestureEnabled: false }} />

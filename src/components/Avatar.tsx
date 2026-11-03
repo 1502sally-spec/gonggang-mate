@@ -1,6 +1,7 @@
 import { Image } from 'expo-image';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
+import { Icon } from '@/components/Icon';
 import { colors } from '@/constants/theme';
 
 type Props = {
@@ -9,7 +10,7 @@ type Props = {
   size?: number;
 };
 
-/** 원형 프로필 사진. 사진이 없으면 닉네임 첫 글자를 보여 준다. (PRD 4.3) */
+/** 원형 프로필 사진. 사진이 없으면 사람 아이콘을 보여 준다 (디자인팀 UI). */
 export function Avatar({ nickname, photoUrl, size = 40 }: Props) {
   const circle = { width: size, height: size, borderRadius: size / 2 };
 
@@ -19,7 +20,7 @@ export function Avatar({ nickname, photoUrl, size = 40 }: Props) {
 
   return (
     <View style={[styles.fallback, circle]} accessibilityLabel={`${nickname} 프로필`}>
-      <Text style={[styles.initial, { fontSize: size * 0.42 }]}>{nickname.slice(0, 1)}</Text>
+      <Icon name="user" size={size * 0.5} color={colors.primaryBright} />
     </View>
   );
 }
@@ -27,8 +28,9 @@ export function Avatar({ nickname, photoUrl, size = 40 }: Props) {
 const styles = StyleSheet.create({
   fallback: {
     backgroundColor: colors.primaryTint,
+    borderWidth: 1.5,
+    borderColor: colors.primarySoft,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  initial: { color: colors.primary, fontWeight: '700' },
 });
