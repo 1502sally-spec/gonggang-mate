@@ -205,8 +205,9 @@ begin
   update public.appointments
   set start_at = p_start_at, end_at = p_end_at, place = trim(p_place), activity = trim(coalesce(p_activity, ''))
   where id = p_appointment_id;
-  update public.appointment_members set seen_at = null, notified_at = null
-  where appointment_id = p_appointment_id and canceled_at is null and user_id <> auth.uid();
+  update public.appointment_members
+  set notified_at = null, seen_at = case when user_id = auth.uid() then seen_at end -- 30분 전 알림은 방장도 다시 받는다. 배지는 다른 참여자만
+  where appointment_id = p_appointment_id and canceled_at is null;
   insert into public.messages (room_id, sender_id, type, body) values (v_room.id, null, 'system', '일정이 변경되었어요');
 
   return public.appointment_item(p_appointment_id);
@@ -222,6 +223,22 @@ alter table public.chat_rooms add column kind text not null default 'post' check
 alter table public.chat_rooms add column direct_key text unique;
 alter table public.chat_rooms add constraint chat_rooms_kind_shape_check
   check ((kind = 'post' and post_id is not null and direct_key is null) or (kind = 'direct' and post_id is null and direct_key is not null));
+
+-- 1:1 방의 상대 id. 참여자 목록이 아니라 direct_key에서 꺼내서, 상대가 방을 나갔어도(차단 후 나가기 포함) 알 수 있다
+create function public.direct_partner_id(p_direct_key text) returns uuid
+language sql stable set search_path = '' as $$
+  select (case when split_part(p_direct_key, ':', 1) = auth.uid()::text then split_part(p_direct_key, ':', 2) else split_part(p_direct_key, ':', 1) end)::uuid;
+$$;
+
+-- 게임 실행·공유를 막는 '닫힌 방': 방장이 약속을 취소한 게시물 방 + 상대와 차단 관계인 1:1 방
+create or replace function public.is_room_closed(p_room_id uuid) returns boolean
+language sql stable security definer set search_path = '' as $$
+  select exists (
+    select 1 from public.chat_rooms r left join public.posts p on p.id = r.post_id
+    where r.id = p_room_id
+      and (p.status = 'closed' or (r.kind = 'direct' and public.is_blocked_with(public.direct_partner_id(r.direct_key))))
+  );
+$$;
 
 -- S13 '1:1 채팅': 방이 있으면 그 방, 없으면 새로 만든다. 나간 적이 있으면 다시 참여시킨다. 방 id를 돌려준다
 create function public.open_direct_room(p_user_id uuid) returns uuid
@@ -299,8 +316,8 @@ returns table (
 language sql stable security definer set search_path = '' as $$
   select
     r.id, r.kind, p.id, p.category,
-    case when r.kind = 'direct' then pu.nickname else p.title end,
-    case when r.kind = 'direct' then jsonb_build_object('id', pu.id, 'nickname', pu.nickname, 'photo_url', pu.photo_url) end,
+    case when r.kind = 'direct' then coalesce(pu.nickname, '알 수 없는 사용자') else p.title end, -- 상대가 탈퇴하면 pu가 없다
+    case when pu.id is not null then jsonb_build_object('id', pu.id, 'nickname', pu.nickname, 'photo_url', pu.photo_url) end,
     (
       select coalesce(jsonb_agg(jsonb_build_object('id', u.id, 'nickname', u.nickname, 'photo_url', u.photo_url) order by m.joined_at), '[]'::jsonb)
       from public.chat_members m join public.users u on u.id = m.user_id
@@ -322,9 +339,8 @@ language sql stable security definer set search_path = '' as $$
   left join public.posts p on p.id = r.post_id
   left join lateral (
     select u.id, u.nickname, u.photo_url
-    from public.chat_members m join public.users u on u.id = m.user_id
-    where m.room_id = r.id and r.kind = 'direct' and m.user_id <> auth.uid()
-    limit 1
+    from public.users u
+    where r.kind = 'direct' and u.id = public.direct_partner_id(r.direct_key)
   ) pu on true
   left join lateral (
     select
@@ -363,9 +379,8 @@ begin
       ) end,
       'partner', (
         select jsonb_build_object('id', u.id, 'nickname', u.nickname, 'photo_url', u.photo_url)
-        from public.chat_members m join public.users u on u.id = m.user_id
-        where r.kind = 'direct' and m.room_id = r.id and m.user_id <> auth.uid()
-        limit 1
+        from public.users u
+        where r.kind = 'direct' and u.id = public.direct_partner_id(r.direct_key)
       ),
       'host', (select jsonb_build_object('id', u.id, 'nickname', u.nickname, 'photo_url', u.photo_url) from public.users u where u.id = r.host_id),
       'members', (
@@ -419,8 +434,8 @@ create policy "참여한 방에 메시지 보내기" on public.messages for inse
     where r.id = room_id and p.status = 'closed'
   )
   and not exists (
-    select 1 from public.chat_rooms r join public.chat_members m on m.room_id = r.id
-    where r.id = room_id and r.kind = 'direct' and m.user_id <> (select auth.uid()) and public.is_blocked_with(m.user_id)
+    select 1 from public.chat_rooms r
+    where r.id = room_id and r.kind = 'direct' and public.is_blocked_with(public.direct_partner_id(r.direct_key))
   )
 );
 
@@ -430,10 +445,12 @@ revoke execute on function public.touch_active() from public, anon;
 revoke execute on function public.is_user_active(uuid) from public, anon, authenticated;
 revoke execute on function public.get_matching_posts(text) from public, anon;
 revoke execute on function public.update_appointment(uuid, timestamptz, timestamptz, text, text) from public, anon;
+revoke execute on function public.direct_partner_id(text) from public, anon;
 revoke execute on function public.open_direct_room(uuid) from public, anon;
 revoke execute on function public.get_my_rooms(text) from public, anon;
 grant execute on function public.touch_active() to authenticated;
 grant execute on function public.get_matching_posts(text) to authenticated;
 grant execute on function public.update_appointment(uuid, timestamptz, timestamptz, text, text) to authenticated;
+grant execute on function public.direct_partner_id(text) to authenticated; -- 메시지 보내기 policy에서 쓴다
 grant execute on function public.open_direct_room(uuid) to authenticated;
 grant execute on function public.get_my_rooms(text) to authenticated;
