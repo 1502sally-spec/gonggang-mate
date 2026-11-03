@@ -13,10 +13,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { api, ApiError } from '@/api';
 import { Button } from '@/components/Button';
+import { Icon } from '@/components/Icon';
 import { TextField } from '@/components/TextField';
 import { TimeGrid, type TimeRange } from '@/components/TimeGrid';
 import { POST_CONTENT_MAX, POST_TITLE_MAX } from '@/constants/config';
-import { categoryInfo, colors, fontSize, MIN_TOUCH, spacing, type Category } from '@/constants/theme';
+import { categoryInfo, colors, fontSize, MIN_TOUCH, radius, spacing, type Category } from '@/constants/theme';
 import { formatDateRange, formatDuration, nextOccurrence, totalMinutes } from '@/lib/time';
 
 export default function NewPostScreen() {
@@ -66,7 +67,7 @@ export default function NewPostScreen() {
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={styles.topBar}>
           <Pressable accessibilityRole="button" accessibilityLabel="닫기" onPress={() => router.back()} style={styles.close} hitSlop={8}>
-            <Text style={styles.closeText}>✕</Text>
+            <Icon name="x" size={24} color={colors.ink} />
           </Pressable>
           <Text style={styles.title}>{info ? `${info.label} 게시물 작성` : '게시물 작성'}</Text>
           <View style={styles.close} />
@@ -76,6 +77,7 @@ export default function NewPostScreen() {
         <ScrollView style={styles.form} contentContainerStyle={styles.formContent} keyboardShouldPersistTaps="handled">
           <TextField
             label="제목"
+            required
             value={title}
             onChangeText={setTitle}
             maxLength={POST_TITLE_MAX}
@@ -85,6 +87,7 @@ export default function NewPostScreen() {
           />
           <TextField
             label="내용"
+            required
             value={content}
             onChangeText={setContent}
             maxLength={POST_CONTENT_MAX}
@@ -96,7 +99,7 @@ export default function NewPostScreen() {
         </ScrollView>
 
         <View style={styles.gridHeader}>
-          <Text style={styles.label}>약속시간</Text>
+          <Text style={styles.label}>약속시간 *</Text>
           <Text style={styles.guide}>한 요일에서 드래그해서 골라 주세요. 옅은 칸은 내 공강이에요.</Text>
         </View>
         <View style={styles.gridArea} onTouchStart={Keyboard.dismiss}>
@@ -107,7 +110,7 @@ export default function NewPostScreen() {
           <Text style={styles.summary} accessibilityLiveRegion="polite">
             {when ? `${formatDateRange(when.start_at, when.end_at)} · ${formatDuration(totalMinutes(range))}` : '아직 약속시간을 고르지 않았어요'}
           </Text>
-          <Button label={posting ? '올리는 중…' : '게시'} onPress={onPost} disabled={!canPost} />
+          <Button label={posting ? '올리는 중…' : '게시하기'} onPress={onPost} disabled={!canPost} />
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -115,19 +118,27 @@ export default function NewPostScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.white },
+  safe: { flex: 1, backgroundColor: colors.bg },
   flex: { flex: 1 },
   topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.sm },
   close: { width: MIN_TOUCH, height: MIN_TOUCH, alignItems: 'center', justifyContent: 'center' },
-  closeText: { fontSize: 20, color: colors.ink },
-  title: { fontSize: 18, fontWeight: '900', color: colors.ink },
+  title: { fontSize: 20, fontWeight: '900', color: colors.primary },
   // 내용이 길어져도 격자 자리를 남겨 둔다
   form: { flexGrow: 0, maxHeight: '35%' },
-  formContent: { paddingHorizontal: spacing.md, paddingBottom: spacing.sm, gap: spacing.md },
-  gridHeader: { paddingHorizontal: spacing.md, paddingTop: spacing.sm, gap: spacing.xs },
-  label: { color: colors.ink, fontSize: fontSize.caption + 1, fontWeight: '700' },
+  formContent: { paddingHorizontal: spacing.lg - 4, paddingBottom: spacing.sm, gap: spacing.md - 2 },
+  gridHeader: { paddingHorizontal: spacing.lg - 4, paddingTop: spacing.sm, gap: 2 },
+  label: { color: colors.primary, fontSize: fontSize.body - 1, fontWeight: '800' },
   guide: { color: colors.sub, fontSize: fontSize.caption, marginBottom: spacing.xs },
   gridArea: { flex: 1, paddingHorizontal: spacing.sm },
-  bottom: { padding: spacing.md, gap: spacing.sm, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.line },
-  summary: { color: colors.ink, fontSize: fontSize.body, fontWeight: '700', textAlign: 'center' },
+  bottom: { paddingHorizontal: spacing.lg - 4, paddingTop: spacing.sm, paddingBottom: spacing.sm, gap: spacing.sm },
+  summary: {
+    color: colors.primary,
+    fontSize: fontSize.body - 1,
+    fontWeight: '800',
+    textAlign: 'center',
+    paddingVertical: spacing.sm,
+    borderRadius: radius.control,
+    backgroundColor: colors.primaryTint,
+    overflow: 'hidden',
+  },
 });

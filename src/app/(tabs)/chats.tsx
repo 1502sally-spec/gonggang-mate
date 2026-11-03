@@ -6,16 +6,18 @@
  * - 실시간 갱신: 화면에 들어올 때, 앱으로 돌아올 때, 보고 있는 동안 REFRESH_MS마다 다시 불러온다.
  * - 방장이 약속을 취소해 닫힌 방은 서버가 목록에서 뺀다 (11/3 결정).
  * 11/3 결정 12번: 1:1 방(kind = 'direct')은 카테고리가 없어서 맨 끝 '1:1' 탭에 모은다.
- * 디자인은 나중에 피그마 반영 예정 (지금은 기능 위주).
+ * 디자인팀 UI 반영(11/4, A): 제목 + 검색 아이콘, 채팅 검색 칸, 방 한 줄(사진·이름·방장 태그·시간·미리보기·보라 배지).
+ * 디자인에 없는 카테고리·1:1 탭은 둥근 칩으로 검색 칸 아래에 둔다.
  */
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, AppState, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, AppState, FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { api, ApiError, type RoomListItem } from '@/api';
 import { Avatar } from '@/components/Avatar';
-import { CATEGORIES, categoryInfo, colors, fontSize, MIN_TOUCH, spacing, type Category } from '@/constants/theme';
+import { Icon } from '@/components/Icon';
+import { CATEGORIES, categoryInfo, colors, fontSize, radius, spacing, type Category } from '@/constants/theme';
 import { formatDate, kstMinutesOfDay, minutesToTime } from '@/lib/time';
 
 const REFRESH_MS = 15_000;
@@ -25,12 +27,13 @@ type Tab = Category | 'direct';
 const TABS: Tab[] = [...CATEGORIES, 'direct'];
 const tabLabel = (t: Tab) => (t === 'direct' ? '1:1' : categoryInfo[t].label);
 const inTab = (r: RoomListItem, t: Tab) => (t === 'direct' ? r.kind === 'direct' : r.kind !== 'direct' && r.category === t);
-const AVATAR_STACK = 3; // 겹쳐 보여 줄 아바타 수
 
 export default function ChatsScreen() {
   const [rooms, setRooms] = useState<RoomListItem[] | null>(null);
   const [tab, setTab] = useState<Tab | null>(null); // null = 아직 안 고름 (처음 불러온 뒤 정한다)
   const [refreshing, setRefreshing] = useState(false);
+  const [query, setQuery] = useState('');
+  const [searchOpen, setSearchOpen] = useState(true);
 
   const load = useCallback(async (showError: boolean) => {
     try {
@@ -75,46 +78,86 @@ export default function ChatsScreen() {
     );
   }
 
-  const visible = rooms.filter((r) => inTab(r, tab));
+  const q = query.trim().toLowerCase();
+  const matches = (r: RoomListItem) =>
+    !q || r.title.toLowerCase().includes(q) || (r.last_message?.body ?? '').toLowerCase().includes(q) || r.members.some((m) => m.nickname.toLowerCase().includes(q));
+  // 검색 중에는 모든 탭에서 찾는다
+  const visible = rooms.filter((r) => (q ? matches(r) : inTab(r, tab)));
   const unreadOf = (t: Tab) => rooms.filter((r) => inTab(r, t)).reduce((sum, r) => sum + r.unread_count + r.pending_request_count, 0);
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      <Text style={styles.title}>채팅</Text>
-
-      <View style={styles.tabs} accessibilityRole="tablist">
-        {TABS.map((c) => {
-          const selected = c === tab;
-          const count = unreadOf(c);
-          return (
-            <Pressable
-              key={c}
-              accessibilityRole="tab"
-              accessibilityState={{ selected }}
-              accessibilityLabel={count > 0 ? `${tabLabel(c)}, 새 소식 ${count}개` : tabLabel(c)}
-              onPress={() => setTab(c)}
-              style={[styles.tab, selected && styles.tabSelected]}
-            >
-              <Text style={[styles.tabText, selected && styles.tabTextSelected]}>{tabLabel(c)}</Text>
-              {count > 0 ? <Badge count={count} /> : null}
-            </Pressable>
-          );
-        })}
+      <View style={styles.titleRow}>
+        <Text style={styles.title} accessibilityRole="header">
+          채팅
+        </Text>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={searchOpen ? '검색 닫기' : '채팅 검색'}
+          onPress={() => {
+            setSearchOpen((v) => !v);
+            setQuery('');
+          }}
+          style={styles.iconButton}
+          hitSlop={8}
+        >
+          <Icon name={searchOpen ? 'x' : 'search'} size={22} color={colors.ink} />
+        </Pressable>
       </View>
+
+      {searchOpen ? (
+        <View style={styles.search}>
+          <Icon name="search" size={18} color={colors.sub} />
+          <TextInput
+            value={query}
+            onChangeText={setQuery}
+            placeholder="채팅 검색"
+            placeholderTextColor={colors.sub}
+            accessibilityLabel="채팅 검색"
+            style={styles.searchInput}
+            returnKeyType="search"
+          />
+        </View>
+      ) : null}
+
+      {!q ? (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs} style={styles.tabsWrap} accessibilityRole="tablist">
+          {TABS.map((c) => {
+            const selected = c === tab;
+            const count = unreadOf(c);
+            return (
+              <Pressable
+                key={c}
+                accessibilityRole="tab"
+                accessibilityState={{ selected }}
+                accessibilityLabel={count > 0 ? `${tabLabel(c)}, 새 소식 ${count}개` : tabLabel(c)}
+                onPress={() => setTab(c)}
+                style={[styles.tab, selected && styles.tabSelected]}
+              >
+                <Text style={[styles.tabText, selected && styles.tabTextSelected]}>{tabLabel(c)}</Text>
+                {count > 0 ? <Badge count={count} /> : null}
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+      ) : null}
 
       <FlatList
         data={visible}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
+        keyboardShouldPersistTaps="handled"
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         renderItem={({ item }) => (
           <RoomRow room={item} onPress={() => router.push({ pathname: '/chat/[roomId]', params: { roomId: item.id } })} />
         )}
         ListEmptyComponent={
           <Text style={styles.empty}>
-            {tab === 'direct'
-              ? '1:1 채팅방이 없어요.\n메이트 프로필에서 1:1 채팅을 눌러 보세요.'
-              : `${tabLabel(tab)} 채팅방이 없어요.\n게시판에서 채팅 요청을 보내거나 글을 써 보세요.`}
+            {q
+              ? '검색 결과가 없어요'
+              : tab === 'direct'
+                ? '1:1 채팅방이 없어요.\n메이트 프로필에서 1:1 채팅을 눌러 보세요.'
+                : `${tabLabel(tab)} 채팅방이 없어요.\n게시판에서 채팅 요청을 보내거나 글을 써 보세요.`}
           </Text>
         }
       />
@@ -122,10 +165,14 @@ export default function ChatsScreen() {
   );
 }
 
+/** 채팅방 한 줄 (디자인: 사진 · 이름 + 방장 태그 · 시간 / 미리보기 · 안 읽은 수) */
 function RoomRow({ room, onPress }: { room: RoomListItem; onPress: () => void }) {
   const last = room.last_message;
   const preview = last ? (last.sender_nickname ? `${last.sender_nickname}: ${last.body}` : last.body) : '아직 메시지가 없어요';
-  const stack = room.members.slice(0, AVATAR_STACK);
+  const isDirect = room.kind === 'direct';
+  // 게시물 방은 처음 들어온 사람(목록 맨 앞)이 방장이다
+  const face = isDirect ? room.partner : room.members[0];
+  const host = isDirect ? null : room.members[0];
 
   return (
     <Pressable
@@ -134,12 +181,13 @@ function RoomRow({ room, onPress }: { room: RoomListItem; onPress: () => void })
       onPress={onPress}
       style={({ pressed }) => [styles.row, pressed && styles.pressed]}
     >
-      <View style={[styles.stack, { width: 40 + (stack.length - 1) * 14 }]}>
-        {stack.map((m, i) => (
-          <View key={m.id} style={[styles.stackItem, { left: i * 14, zIndex: AVATAR_STACK - i }]}>
-            <Avatar nickname={m.nickname} photoUrl={m.photo_url} size={40} />
+      <View>
+        <Avatar nickname={face?.nickname ?? room.title} photoUrl={face?.photo_url ?? null} size={52} />
+        {!isDirect && room.member_count > 1 ? (
+          <View style={styles.memberBubble}>
+            <Text style={styles.memberBubbleText}>{room.member_count}</Text>
           </View>
-        ))}
+        ) : null}
       </View>
 
       <View style={styles.rowBody}>
@@ -147,7 +195,18 @@ function RoomRow({ room, onPress }: { room: RoomListItem; onPress: () => void })
           <Text style={styles.roomTitle} numberOfLines={1}>
             {room.title}
           </Text>
-          <Text style={styles.memberCount}>{room.member_count}</Text>
+          {host ? (
+            <View style={styles.hostTag}>
+              <Text style={styles.hostTagText} numberOfLines={1}>
+                방장: {room.is_host ? '나' : host.nickname}
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.hostTag}>
+              <Text style={styles.hostTagText}>1:1</Text>
+            </View>
+          )}
+          <View style={styles.flex} />
           {last ? <Text style={styles.time}>{formatMessageTime(last.created_at)}</Text> : null}
         </View>
         <View style={styles.rowBottom}>
@@ -181,55 +240,69 @@ function formatMessageTime(at: string): string {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
-  title: { color: colors.ink, fontSize: fontSize.title, fontWeight: '900', paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
+  flex: { flex: 1 },
+  titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingLeft: spacing.lg - 4, paddingRight: spacing.sm, paddingTop: spacing.md },
+  title: { color: colors.ink, fontSize: fontSize.title + 2, fontWeight: '900' },
+  iconButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   loading: { marginTop: spacing.lg },
-  tabs: { flexDirection: 'row', paddingHorizontal: spacing.md, gap: spacing.sm, marginBottom: spacing.sm },
-  tab: {
-    flex: 1,
-    minHeight: MIN_TOUCH,
+  search: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.xs,
-    borderRadius: 12,
+    gap: spacing.sm,
+    marginHorizontal: spacing.lg - 4,
+    marginTop: spacing.xs,
+    paddingHorizontal: spacing.md,
+    minHeight: 46,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.white,
+  },
+  searchInput: { flex: 1, minWidth: 0, color: colors.ink, fontSize: fontSize.body },
+  tabsWrap: { flexGrow: 0 },
+  tabs: { gap: spacing.sm, paddingHorizontal: spacing.lg - 4, paddingVertical: spacing.md - 4 },
+  tab: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    minHeight: 34,
+    paddingHorizontal: 14,
+    borderRadius: radius.pill,
     borderWidth: 1,
     borderColor: colors.line,
     backgroundColor: colors.white,
   },
   tabSelected: { backgroundColor: colors.primary, borderColor: colors.primary },
-  tabText: { color: colors.ink, fontSize: fontSize.body, fontWeight: '700' },
+  tabText: { color: colors.ink, fontSize: fontSize.body - 1, fontWeight: '700' },
   tabTextSelected: { color: colors.white },
-  list: { paddingHorizontal: spacing.md, paddingBottom: spacing.lg, gap: spacing.sm, flexGrow: 1 },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    padding: spacing.md,
-    borderRadius: 16,
-    backgroundColor: colors.white,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.line,
-  },
-  pressed: { opacity: 0.8 },
-  stack: { height: 40 },
-  stackItem: { position: 'absolute', top: 0, borderRadius: 20, borderWidth: 2, borderColor: colors.white },
-  rowBody: { flex: 1, gap: 2 },
-  rowTop: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-  roomTitle: { flexShrink: 1, color: colors.ink, fontSize: fontSize.body, fontWeight: '700' },
-  memberCount: { color: colors.sub, fontSize: fontSize.caption, marginRight: 'auto' },
-  time: { color: colors.sub, fontSize: fontSize.caption },
-  rowBottom: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  preview: { flex: 1, color: colors.sub, fontSize: fontSize.caption + 1 },
-  request: { color: colors.alert, fontSize: fontSize.caption, fontWeight: '700' },
-  badge: {
+  list: { paddingHorizontal: spacing.md, paddingBottom: spacing.lg, flexGrow: 1 },
+  empty: { color: colors.sub, fontSize: fontSize.body - 1, textAlign: 'center', marginTop: spacing.lg * 2, lineHeight: 22 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: spacing.md - 4, paddingVertical: spacing.md - 4, paddingHorizontal: spacing.xs },
+  pressed: { opacity: 0.7 },
+  memberBubble: {
+    position: 'absolute',
+    right: -4,
+    bottom: -2,
     minWidth: 20,
     height: 20,
-    paddingHorizontal: 6,
+    paddingHorizontal: 4,
     borderRadius: 10,
+    borderWidth: 2,
+    borderColor: colors.bg,
+    backgroundColor: colors.primaryTint,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.alert,
   },
-  badgeText: { color: colors.white, fontSize: fontSize.caption - 1, fontWeight: '700' },
-  empty: { color: colors.sub, fontSize: fontSize.body, textAlign: 'center', marginTop: spacing.lg, lineHeight: 22 },
+  memberBubbleText: { color: colors.primary, fontSize: 10, fontWeight: '800' },
+  rowBody: { flex: 1, gap: 3 },
+  rowTop: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  roomTitle: { flexShrink: 1, color: colors.ink, fontSize: fontSize.body + 1, fontWeight: '800' },
+  hostTag: { flexShrink: 1, maxWidth: 110, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, backgroundColor: colors.lineSoft },
+  hostTagText: { color: colors.sub, fontSize: fontSize.caption - 1, fontWeight: '700' },
+  time: { color: colors.sub, fontSize: fontSize.caption },
+  rowBottom: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  preview: { flex: 1, color: colors.sub, fontSize: fontSize.body - 1 },
+  request: { color: colors.danger, fontSize: fontSize.caption, fontWeight: '700' },
+  badge: { minWidth: 22, height: 22, paddingHorizontal: 6, borderRadius: 11, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
+  badgeText: { color: colors.white, fontSize: fontSize.caption, fontWeight: '800' },
 });

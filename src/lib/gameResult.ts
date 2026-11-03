@@ -18,6 +18,17 @@ export const GAME_INFO: Record<GameType, { label: string; emoji: string; descrip
   teams: { label: '팀 나누기', emoji: '👥', description: '참여자를 팀으로 나눠요' },
 };
 
+/** 게임 카드 꾸밈 (디자인팀 UI: 색 타일, 태그, 아래 힌트) — S16 게임 선택, S12 미니게임 선택창 공용 */
+export const GAME_CARD: Record<GameType, { tag: string; tile: string; tagColor: string; hint: string }> = {
+  ladder: { tag: '짝짓기', tile: '#EDE9FE', tagColor: '#7C3AED', hint: '누가 무엇을 맡을까?' },
+  draw: { tag: '뽑기', tile: '#FEF3C7', tagColor: '#D97706', hint: '오늘의 당첨자는?' },
+  order: { tag: '순서', tile: '#DCFCE7', tagColor: '#16A34A', hint: '누가 먼저 할까?' },
+  wheel: { tag: '뽑기', tile: '#FCE7F3', tagColor: '#DB2777', hint: '메뉴 고르기에 딱' },
+  teams: { tag: '팀', tile: '#E0F2FE', tagColor: '#0284C7', hint: '공평하게 팀 나누기' },
+};
+
+export const GAME_TYPES: GameType[] = ['ladder', 'draw', 'order', 'wheel', 'teams'];
+
 const TEAM_NAMES = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J'];
 
 /** 결과를 줄 단위 문장으로. nameOf는 user_id → 닉네임 (모르면 '알 수 없음') */
