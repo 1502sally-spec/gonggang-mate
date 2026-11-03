@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { Icon } from '@/components/Icon';
 import { colors, fontSize, MIN_TOUCH, spacing } from '@/constants/theme';
 
 type Props = {
@@ -22,7 +23,7 @@ export function FormScreen({ title, subtitle, onBack, children, footer }: Props)
         <View style={styles.topBar}>
           {onBack ? (
             <Pressable accessibilityRole="button" accessibilityLabel="뒤로가기" onPress={onBack} style={styles.back} hitSlop={8}>
-              <Text style={styles.backText}>‹</Text>
+              <Icon name="arrow-left" size={24} color={colors.ink} />
             </Pressable>
           ) : null}
         </View>
@@ -42,10 +43,9 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   topBar: { minHeight: MIN_TOUCH, paddingHorizontal: spacing.sm, justifyContent: 'center' },
   back: { width: MIN_TOUCH, height: MIN_TOUCH, alignItems: 'center', justifyContent: 'center' },
-  backText: { fontSize: 30, color: colors.ink },
   content: { padding: spacing.lg, paddingTop: spacing.sm, gap: spacing.sm },
-  title: { color: colors.ink, fontSize: fontSize.title, fontWeight: '900' },
+  title: { color: colors.primary, fontSize: fontSize.title + 2, fontWeight: '900' },
   subtitle: { color: colors.sub, fontSize: fontSize.body },
-  body: { marginTop: spacing.md, gap: spacing.md },
+  body: { marginTop: spacing.md, gap: spacing.md + 2 },
   footer: { padding: spacing.lg, paddingTop: spacing.sm, gap: spacing.sm },
 });

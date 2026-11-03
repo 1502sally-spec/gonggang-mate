@@ -1,5 +1,5 @@
 /**
- * S02 로그인 — 담당: A
+ * S02 로그인 — 담당: A (디자인팀 UI에 없는 화면 → 회원가입 화면 형식을 따름)
  * PRD: 학교 이메일(=아이디) + 비밀번호. 별도 아이디 없음.
  * - 성공: 세션 저장(자동 로그인) 후 S05. 프로필이 없으면 S04 신규 설정.
  * - 실패: "이메일 또는 비밀번호를 확인해 주세요" (어느 쪽이 틀렸는지 구분하지 않음)
@@ -42,17 +42,18 @@ export default function LoginScreen() {
   return (
     <FormScreen
       title="로그인"
-      subtitle="학교 이메일로 로그인해 주세요"
+      subtitle="공강메이트에 오신 것을 환영합니다"
       footer={<Button label={loading ? '로그인 중…' : '로그인'} onPress={onLogin} disabled={!canSubmit} />}
     >
       <TextField
-        label="학교 이메일"
+        label="e-mail 주소"
+        required
         value={email}
         onChangeText={(t) => {
           setEmail(t);
           setError(null);
         }}
-        placeholder="example@cau.ac.kr"
+        placeholder="이메일@cau.ac.kr"
         keyboardType="email-address"
         autoCapitalize="none"
         autoCorrect={false}
@@ -63,13 +64,15 @@ export default function LoginScreen() {
       />
       <TextField
         ref={passwordRef}
-        label="비밀번호"
+        label="password"
+        required
         value={password}
         onChangeText={(t) => {
           setPassword(t);
           setError(null);
         }}
         secureTextEntry
+        placeholder="비밀번호를 입력해주세요"
         autoCapitalize="none"
         autoComplete="password"
         textContentType="password"

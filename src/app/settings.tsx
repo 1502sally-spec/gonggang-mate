@@ -1,28 +1,35 @@
 /**
- * S04 설정(프로필) — 담당: A
- * PRD: 프로필 사진, 닉네임(필수, 2~10자, 중복 불가), 성별(필수), 한줄소개(최대 40자, 글자 수 표시).
- * - 신규 가입자(mode=new): 가입 직후 자동 진입. 뒤로가기 없음, 버튼 "저장하고 시작하기" → S05
- * - 기존 사용자(S05 톱니바퀴): 뒤로가기 있음, 버튼 "저장" → S05
- * - 프로필 사진: 서버 업로드가 아직 없어서(P2) 지금은 닉네임 첫 글자 아바타로 표시
- * - 기존 사용자에게만: 차단 목록 보기·해제(PRD 8.2), 로그아웃
+ * S04 설정(프로필) — 담당: A (디자인팀 UI 반영)
+ * - 프로필 카드: 사진(없으면 사람 아이콘), 닉네임(필수, 2~10자, 중복 불가), 한줄소개(최대 40자), 성별(필수, 디자인에 없어 카드 안에 추가)
+ * - 내 메이트하트(개수 + 막대), 대표 후기(가장 많이 받은 후기 항목) — 기존 사용자만
+ * - 차단 목록 보기·해제(PRD 8.2, 디자인에 없어 카드로 추가), 로그아웃, 저장 버튼(디자인에 없어 하단에 추가)
+ * - 관심활동은 넣지 않는다 (11/3 결정 6번)
+ * - 신규 가입자(mode=new): 회원가입 중 프로필 저장이 끊긴 경우의 예비 화면. 뒤로가기 없음, 버튼 "저장하고 시작하기"
  */
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { api, ApiError, type MiniUser } from '@/api';
+import { api, ApiError, type MateInfo, type MiniUser } from '@/api';
 import { Avatar } from '@/components/Avatar';
 import { Button } from '@/components/Button';
 import { FormScreen } from '@/components/FormScreen';
+import { type Gender, GenderPicker } from '@/components/GenderPicker';
+import { Icon } from '@/components/Icon';
 import { TextField } from '@/components/TextField';
 import { BIO_MAX_LENGTH, NICKNAME_MAX_LENGTH, NICKNAME_MIN_LENGTH } from '@/constants/config';
-import { colors, fontSize, MIN_TOUCH, spacing } from '@/constants/theme';
+import { colors, fontSize, radius, spacing } from '@/constants/theme';
+import { REVIEW_ITEMS } from '@/types/db';
 
-type Gender = 'male' | 'female';
-const GENDERS: { value: Gender; label: string }[] = [
-  { value: 'male', label: '남성' },
-  { value: 'female', label: '여성' },
-];
+/** 메이트하트 막대가 가득 차는 개수 (보기용) */
+const HEART_BAR_MAX = 20;
+
+/** 가장 많이 받은 후기 항목. 받은 후기가 없으면 null */
+function topReview(info: MateInfo | null): string | null {
+  if (!info) return null;
+  const best = REVIEW_ITEMS.map((item) => ({ label: item.label, count: info.review_counts[item.key] ?? 0 })).sort((a, b) => b.count - a.count)[0];
+  return best && best.count > 0 ? best.label : null;
+}
 
 export default function SettingsScreen() {
   const { mode } = useLocalSearchParams<{ mode?: string }>();
@@ -33,6 +40,7 @@ export default function SettingsScreen() {
   const [gender, setGender] = useState<Gender | null>(null);
   const [bio, setBio] = useState('');
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [mate, setMate] = useState<MateInfo | null>(null); // 내 하트·받은 후기
   const [saving, setSaving] = useState(false);
   const [nicknameError, setNicknameError] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -47,7 +55,11 @@ export default function SettingsScreen() {
         setGender(me.nickname ? me.gender : null);
         setBio(me.bio ?? '');
         setPhotoUrl(me.photo_url);
-        if (!isNew) setBlocked(await api.blocks.getBlockedUsers());
+        if (!isNew && me.nickname) {
+          const [blockedList, info] = await Promise.all([api.blocks.getBlockedUsers(), api.users.getMateInfo(me.id).catch(() => null)]);
+          setBlocked(blockedList);
+          setMate(info);
+        }
       } catch (e) {
         setSubmitError(e instanceof ApiError ? e.message : '내 정보를 불러오지 못했어요');
       } finally {
@@ -120,6 +132,9 @@ export default function SettingsScreen() {
     );
   }
 
+  const hearts = mate?.heart_count ?? 0;
+  const review = topReview(mate);
+
   return (
     <FormScreen
       title={isNew ? '프로필 설정' : '설정'}
@@ -128,85 +143,75 @@ export default function SettingsScreen() {
       footer={
         <>
           {submitError ? <Text style={styles.error}>{submitError}</Text> : null}
-          <Button
-            label={saving ? '저장 중…' : isNew ? '저장하고 시작하기' : '저장'}
-            onPress={onSave}
-            disabled={!canSave}
-          />
+          <Button label={saving ? '저장 중…' : isNew ? '저장하고 시작하기' : '저장'} onPress={onSave} disabled={!canSave} />
         </>
       }
     >
-      <View style={styles.avatarRow}>
-        <Avatar nickname={trimmed || '?'} photoUrl={photoUrl} size={72} />
-        <Text style={styles.photoNote}>프로필 사진은 곧 추가될 예정이에요</Text>
-      </View>
-
-      <TextField
-        label="닉네임 (필수)"
-        value={nickname}
-        onChangeText={(t) => {
-          setNickname(t);
-          setNicknameError(null);
-        }}
-        placeholder={`${NICKNAME_MIN_LENGTH}~${NICKNAME_MAX_LENGTH}자`}
-        maxLength={NICKNAME_MAX_LENGTH}
-        showCount
-        autoCorrect={false}
-        error={
-          nicknameError ??
-          (nickname.length > 0 && trimmed.length < NICKNAME_MIN_LENGTH ? `닉네임은 ${NICKNAME_MIN_LENGTH}자 이상이어야 해요` : null)
-        }
-      />
-
-      <View style={styles.field}>
-        <Text style={styles.label}>성별 (필수)</Text>
-        <View style={styles.genderRow} accessibilityRole="radiogroup">
-          {GENDERS.map((g) => {
-            const selected = gender === g.value;
-            return (
-              <Pressable
-                key={g.value}
-                accessibilityRole="radio"
-                accessibilityState={{ selected }}
-                accessibilityLabel={g.label}
-                onPress={() => setGender(g.value)}
-                style={[styles.genderChip, selected && styles.genderChipOn]}
-              >
-                <Text style={[styles.genderText, selected && styles.genderTextOn]}>{g.label}</Text>
-              </Pressable>
-            );
-          })}
+      {/* 프로필 카드 */}
+      <View style={styles.card}>
+        <View style={styles.avatar}>
+          <Avatar nickname={trimmed || '?'} photoUrl={photoUrl} size={80} />
         </View>
+        <TextField
+          label="닉네임"
+          inlineLabel
+          value={nickname}
+          onChangeText={(t) => {
+            setNickname(t);
+            setNicknameError(null);
+          }}
+          placeholder={`${NICKNAME_MIN_LENGTH}~${NICKNAME_MAX_LENGTH}자`}
+          maxLength={NICKNAME_MAX_LENGTH}
+          autoCorrect={false}
+          error={
+            nicknameError ??
+            (nickname.length > 0 && trimmed.length < NICKNAME_MIN_LENGTH ? `닉네임은 ${NICKNAME_MIN_LENGTH}자 이상이어야 해요` : null)
+          }
+        />
+        <TextField label="한줄소개" inlineLabel value={bio} onChangeText={setBio} placeholder="간단한 자기소개" maxLength={BIO_MAX_LENGTH} />
+        <GenderPicker value={gender} onChange={setGender} />
       </View>
-
-      <TextField
-        label="한줄소개 (선택)"
-        value={bio}
-        onChangeText={setBio}
-        placeholder="예: 같이 밥 먹어요"
-        maxLength={BIO_MAX_LENGTH}
-        showCount
-      />
 
       {!isNew ? (
         <>
-          <View style={styles.field}>
-            <Text style={styles.label}>차단 목록</Text>
+          {/* 내 메이트하트 */}
+          <View style={styles.card}>
+            <View style={styles.heartRow}>
+              <Text style={styles.cardTitle}>내 메이트하트</Text>
+              <View style={styles.heartCount} accessibilityLabel={`메이트하트 ${hearts}개`}>
+                <Icon name="heart" size={20} color={colors.alert} />
+                <Text style={styles.heartText}>{String(hearts).padStart(2, '0')}개</Text>
+              </View>
+            </View>
+            <View style={styles.bar}>
+              <View style={[styles.barFill, { width: `${Math.min(1, hearts / HEART_BAR_MAX) * 100}%` }]} />
+            </View>
+          </View>
+
+          {/* 대표 후기 */}
+          <Text style={styles.sectionTitle}>대표 후기</Text>
+          <View style={[styles.card, styles.reviewCard]}>
+            <Icon name="message-circle" size={18} color={review ? colors.primary : colors.primarySoft} />
+            <Text style={review ? styles.reviewText : styles.muted}>{review ?? '아직 등록된 대표 후기가 없어요'}</Text>
+          </View>
+
+          {/* 차단 목록 (디자인에 없어 같은 카드 형식으로 추가) */}
+          <Text style={styles.sectionTitle}>차단 목록</Text>
+          <View style={styles.card}>
             {blocked.length === 0 ? (
-              <Text style={styles.empty}>차단한 사용자가 없어요</Text>
+              <Text style={styles.muted}>차단한 사용자가 없어요</Text>
             ) : (
               blocked.map((u) => (
                 <View key={u.id} style={styles.blockRow}>
-                  <Avatar nickname={u.nickname} photoUrl={u.photo_url} size={32} />
+                  <Avatar nickname={u.nickname} photoUrl={u.photo_url} size={36} />
                   <Text style={styles.blockName}>{u.nickname}</Text>
-                  <View style={styles.unblock}>
-                    <Button label="해제" variant="secondary" onPress={() => onUnblock(u)} />
-                  </View>
+                  <Button label="해제" variant="secondary" size="sm" onPress={() => onUnblock(u)} />
                 </View>
               ))
             )}
           </View>
-          <Pressable accessibilityRole="button" onPress={onLogout} style={styles.logout}>
+
+          <Pressable accessibilityRole="button" onPress={onLogout} style={styles.logout} hitSlop={8}>
             <Text style={styles.logoutText}>로그아웃</Text>
           </Pressable>
         </>
@@ -217,29 +222,28 @@ export default function SettingsScreen() {
 
 const styles = StyleSheet.create({
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg },
-  avatarRow: { alignItems: 'center', gap: spacing.sm },
-  photoNote: { color: colors.sub, fontSize: fontSize.caption },
-  field: { gap: spacing.sm },
-  label: { color: colors.ink, fontSize: fontSize.caption + 1, fontWeight: '700' },
-  genderRow: { flexDirection: 'row', gap: spacing.sm },
-  genderChip: {
-    flex: 1,
-    minHeight: MIN_TOUCH,
-    borderRadius: 12,
+  card: {
+    gap: spacing.md - 4,
+    padding: spacing.md,
+    borderRadius: radius.card,
     borderWidth: 1,
     borderColor: colors.line,
     backgroundColor: colors.white,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
-  genderChipOn: { borderColor: colors.primary, backgroundColor: colors.primaryTint },
-  genderText: { color: colors.ink, fontSize: fontSize.body },
-  genderTextOn: { color: colors.primary, fontWeight: '700' },
-  empty: { color: colors.sub, fontSize: fontSize.caption },
+  avatar: { alignItems: 'center', marginBottom: spacing.xs },
+  cardTitle: { color: colors.ink, fontSize: fontSize.body + 1, fontWeight: '800' },
+  sectionTitle: { color: colors.ink, fontSize: fontSize.body + 1, fontWeight: '800', marginBottom: -spacing.xs },
+  heartRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  heartCount: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  heartText: { color: colors.alert, fontSize: fontSize.body + 1, fontWeight: '800', fontVariant: ['tabular-nums'] },
+  bar: { height: 8, borderRadius: radius.pill, backgroundColor: colors.primaryTint, overflow: 'hidden' },
+  barFill: { height: '100%', borderRadius: radius.pill, backgroundColor: colors.primary },
+  reviewCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.md - 2 },
+  reviewText: { flex: 1, color: colors.primary, fontSize: fontSize.body, fontWeight: '700' },
+  muted: { flex: 1, color: colors.sub, fontSize: fontSize.body - 1 },
   blockRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   blockName: { flex: 1, color: colors.ink, fontSize: fontSize.body },
-  unblock: { minWidth: 72 },
-  logout: { minHeight: MIN_TOUCH, alignItems: 'center', justifyContent: 'center', marginTop: spacing.md },
-  logoutText: { color: colors.danger, fontSize: fontSize.body, fontWeight: '700' },
-  error: { color: colors.danger, fontSize: fontSize.caption, textAlign: 'center' },
+  logout: { alignSelf: 'flex-start', paddingVertical: spacing.sm },
+  logoutText: { color: colors.sub, fontSize: fontSize.body - 1, textDecorationLine: 'underline' },
+  error: { color: colors.danger, fontSize: fontSize.caption + 1, textAlign: 'center' },
 });

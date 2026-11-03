@@ -1,20 +1,20 @@
 /**
- * S06 공강 설정 — 담당: A
- * PRD: TimeGrid(mode="multi")로 매주 반복되는 공강을 칠한다. 한 칸 = 30분.
- * - '설정 완료' 시 저장 후 S05로 돌아간다.
- * - 저장하지 않고 뒤로 가면 "변경 사항을 저장하지 않을까요?" 확인.
- * 디자인은 나중에 피그마 반영 예정 (지금은 기능 위주).
+ * S06 공강 설정 — 담당: A (디자인팀 UI 반영)
+ * PRD: TimeGrid(mode="multi")로 매주 반복되는 공강을 칠한다. 한 칸 = 30분. 월~금 (11/3 결정).
+ * - '공강 시간 저장' 시 저장 후 S05로 돌아간다. '취소'는 저장하지 않고 돌아간다.
+ * - 저장하지 않고 나가면 "변경 사항을 저장하지 않을까요?" 확인.
+ * - 아래 '입력한 공강 시간' 목록: 요일별 구간 (24시간제)
  */
 import { router, usePreventRemove } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { api, ApiError } from '@/api';
 import { Button } from '@/components/Button';
 import { TimeGrid, type TimeRange } from '@/components/TimeGrid';
-import { colors, fontSize, MIN_TOUCH, spacing } from '@/constants/theme';
-import { formatDuration, totalMinutes } from '@/lib/time';
+import { colors, fontSize, radius, spacing } from '@/constants/theme';
+import { formatDuration, totalMinutes, WEEKDAY_LABELS } from '@/lib/time';
 
 export default function FreeTimeScreen() {
   const [ranges, setRanges] = useState<TimeRange[]>([]);
@@ -30,7 +30,7 @@ export default function FreeTimeScreen() {
       .finally(() => setLoading(false));
   }, []);
 
-  // 저장하지 않고 나가려 하면 확인 (뒤로가기 버튼, 안드로이드 뒤로 키, 밀어서 뒤로가기 모두)
+  // 저장하지 않고 나가려 하면 확인 (취소 버튼, 안드로이드 뒤로 키, 밀어서 뒤로가기 모두)
   const disablePrevention = usePreventRemove(dirty, ({ repeat }) => {
     Alert.alert('변경 사항을 저장하지 않을까요?', undefined, [
       { text: '계속 편집', style: 'cancel' },
@@ -50,14 +50,18 @@ export default function FreeTimeScreen() {
     setDirty(true);
   };
 
+  const goBack = () => {
+    if (router.canGoBack()) router.back();
+    else router.replace('/home');
+  };
+
   const onSave = async () => {
     setSaving(true);
     try {
       await api.freeSlots.saveMyFreeRanges(ranges);
       setDirty(false);
       disablePrevention();
-      if (router.canGoBack()) router.back();
-      else router.replace('/home');
+      goBack();
     } catch (e) {
       Alert.alert(e instanceof ApiError ? e.message : '저장하지 못했어요. 다시 시도해 주세요');
     } finally {
@@ -69,44 +73,82 @@ export default function FreeTimeScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
-      <View style={styles.topBar}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="뒤로가기"
-          onPress={() => router.back()}
-          style={styles.back}
-          hitSlop={8}
-        >
-          <Text style={styles.backText}>‹</Text>
-        </Pressable>
-        <Text style={styles.title}>공강 설정</Text>
-        <View style={styles.back} />
+      <View style={styles.head}>
+        <Text style={styles.title} accessibilityRole="header">
+          공강 시간 설정
+        </Text>
+        <View style={styles.guideBox}>
+          <Text style={styles.guide}>
+            원하는 시간 범위를 <Text style={styles.guideStrong}>길게 눌러서 드래그</Text>해 공강 시간을 입력하세요. 한 칸은 30분 단위이고,
+            이미 입력한 구간은 <Text style={styles.guideStrong}>다시 눌러 드래그</Text>하면 선택을 취소할 수 있어요.
+          </Text>
+        </View>
       </View>
-      <Text style={styles.guide}>수업이 없는 시간을 드래그해서 칠해 주세요. 매주 반복돼요.</Text>
 
       <View style={styles.gridArea}>
         {loading ? <ActivityIndicator style={styles.loading} color={colors.primary} /> : <TimeGrid mode="multi" value={ranges} onChange={onChange} />}
       </View>
 
       <View style={styles.bottom}>
-        <Text style={styles.total} accessibilityLiveRegion="polite">
-          {total > 0 ? `공강 ${formatDuration(total)} 선택됨` : '아직 선택한 공강이 없어요'}
-        </Text>
-        <Button label={saving ? '저장 중…' : '설정 완료'} onPress={onSave} disabled={loading || saving} />
+        <View style={styles.listCard}>
+          <View style={styles.listHead}>
+            <Text style={styles.listTitle}>입력한 공강 시간</Text>
+            {total > 0 ? <Text style={styles.total}>총 {formatDuration(total)}</Text> : null}
+          </View>
+          {ranges.length === 0 ? (
+            <Text style={styles.empty}>아직 입력한 공강 시간이 없어요</Text>
+          ) : (
+            <ScrollView style={styles.list} contentContainerStyle={styles.listContent} nestedScrollEnabled>
+              {ranges.map((r) => (
+                <View key={`${r.weekday}-${r.start}`} style={styles.row}>
+                  <Text style={styles.rowDay}>{WEEKDAY_LABELS[r.weekday]}요일</Text>
+                  <Text style={styles.rowTime}>
+                    {r.start} ~ {r.end}
+                  </Text>
+                </View>
+              ))}
+            </ScrollView>
+          )}
+        </View>
+        <Button label={saving ? '저장 중…' : '공강 시간 저장'} variant="bright" onPress={onSave} disabled={loading || saving} />
+        <Button label="취소" variant="outline" size="sm" onPress={goBack} disabled={saving} />
       </View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.white },
-  topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.sm },
-  back: { width: MIN_TOUCH, height: MIN_TOUCH, alignItems: 'center', justifyContent: 'center' },
-  backText: { fontSize: 30, color: colors.ink },
-  title: { fontSize: 18, fontWeight: '900', color: colors.ink },
-  guide: { color: colors.sub, fontSize: fontSize.caption, paddingHorizontal: spacing.md, marginBottom: spacing.sm },
-  gridArea: { flex: 1, paddingHorizontal: spacing.sm },
+  safe: { flex: 1, backgroundColor: colors.bg },
+  head: { paddingHorizontal: spacing.lg - 4, paddingTop: spacing.lg, gap: spacing.sm },
+  title: { color: colors.primary, fontSize: fontSize.title + 2, fontWeight: '900' },
+  guideBox: { padding: spacing.md - 4, borderRadius: radius.control, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.white },
+  guide: { color: colors.sub, fontSize: fontSize.caption + 1, lineHeight: 19 },
+  guideStrong: { color: colors.primary, fontWeight: '800' },
+  gridArea: { flex: 1, marginTop: spacing.md, marginHorizontal: spacing.sm },
   loading: { marginTop: spacing.lg },
-  bottom: { padding: spacing.md, gap: spacing.sm, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.line },
-  total: { color: colors.ink, fontSize: fontSize.body, fontWeight: '700', textAlign: 'center' },
+  bottom: { paddingHorizontal: spacing.lg - 4, paddingTop: spacing.sm, paddingBottom: spacing.sm, gap: spacing.sm },
+  listCard: {
+    padding: spacing.md - 4,
+    borderRadius: radius.control,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.white,
+    gap: spacing.sm,
+  },
+  listHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  listTitle: { color: colors.primary, fontSize: fontSize.body - 1, fontWeight: '800' },
+  total: { color: colors.primaryBright, fontSize: fontSize.caption + 1, fontWeight: '700' },
+  empty: { color: colors.sub, fontSize: fontSize.caption + 1 },
+  list: { maxHeight: 96 },
+  listContent: { gap: spacing.xs },
+  row: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.md - 4,
+    paddingVertical: spacing.sm,
+    borderRadius: 10,
+    backgroundColor: colors.bg,
+  },
+  rowDay: { color: colors.ink, fontSize: fontSize.body - 1, fontWeight: '700' },
+  rowTime: { color: colors.sub, fontSize: fontSize.body - 1, fontVariant: ['tabular-nums'] },
 });

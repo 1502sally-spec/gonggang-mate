@@ -5,6 +5,7 @@
 
 // ── 공강/약속 시간 격자 (PRD S06, S08) ──
 export const SLOT_MINUTES = 30; // 한 칸 = 30분 (확정)
+export const WEEKDAY_COUNT = 5; // 공강 요일: 월~금 (11/3 결정 3번). 격자·게시물 시간 선택이 이 요일만 보여 준다
 export const DAY_START = '09:00'; // [나중에 논의] 격자 시작 시각 (임시 기본값)
 export const DAY_END = '21:00'; // [나중에 논의] 격자 끝 시각 (임시 기본값)
 

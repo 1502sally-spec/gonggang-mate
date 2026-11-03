@@ -51,17 +51,18 @@ export function PlaceMap({ places, color, showsUserLocation, onSelect }: PlaceMa
 const styles = StyleSheet.create({
   map: { flex: 1 },
   marker: { alignItems: 'center' },
+  // 디자인팀 UI: 보라 이름표 + 흰 테두리 보라 핀
   label: {
     maxWidth: 140,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    marginBottom: 2,
-    borderRadius: 6,
-    backgroundColor: colors.white,
-    color: colors.ink,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    marginBottom: 3,
+    borderRadius: 8,
+    backgroundColor: colors.primaryBright,
+    color: colors.white,
     fontSize: fontSize.caption,
-    fontWeight: '700',
+    fontWeight: '800',
     overflow: 'hidden',
   },
-  pin: { width: 16, height: 16, borderRadius: 8, borderWidth: 2, borderColor: colors.white },
+  pin: { width: 20, height: 20, borderRadius: 10, borderWidth: 5, borderColor: colors.white },
 });

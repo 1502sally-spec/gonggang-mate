@@ -9,7 +9,8 @@ import { Alert, Linking, Pressable, StyleSheet, Text, View } from 'react-native'
 import type { Place } from '@/api';
 import { Button } from '@/components/Button';
 import { BottomSheet } from '@/components/popups/BottomSheet';
-import { colors, fontSize, MIN_TOUCH, placeCategoryInfo, spacing } from '@/constants/theme';
+import { Icon } from '@/components/Icon';
+import { colors, fontSize, MIN_TOUCH, placeCategoryInfo, radius, spacing } from '@/constants/theme';
 
 type Props = {
   place: Place | null;
@@ -37,13 +38,16 @@ export function PlacePopup({ place, onClose }: Props) {
               {place.name}
             </Text>
             <Pressable accessibilityRole="button" accessibilityLabel="닫기" onPress={onClose} style={styles.close} hitSlop={8}>
-              <Text style={styles.closeText}>✕</Text>
+              <Icon name="x" size={22} color={colors.sub} />
             </Pressable>
           </View>
-          <View style={[styles.chip, { backgroundColor: info.background }]}>
-            <Text style={[styles.chipText, { color: info.accent }]}>{info.label}</Text>
+          <View style={styles.chip}>
+            <Text style={styles.chipText}>{info.label}</Text>
           </View>
-          <Text style={styles.address}>{place.address}</Text>
+          <View style={styles.addressRow}>
+            <Icon name="map-pin" size={16} color={colors.primary} />
+            <Text style={styles.address}>{place.address}</Text>
+          </View>
           <Button label="네이버 지도에서 보기" onPress={openNaverMap} disabled={!place.naver_map_url} />
         </View>
       ) : null}
@@ -54,10 +58,10 @@ export function PlacePopup({ place, onClose }: Props) {
 const styles = StyleSheet.create({
   body: { gap: spacing.sm },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  name: { flex: 1, color: colors.ink, fontSize: 20, fontWeight: '900' },
+  name: { flex: 1, color: colors.primary, fontSize: 20, fontWeight: '900' },
   close: { width: MIN_TOUCH, height: MIN_TOUCH, alignItems: 'center', justifyContent: 'center' },
-  closeText: { color: colors.sub, fontSize: 20 },
-  chip: { alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 999 },
-  chipText: { fontSize: fontSize.caption, fontWeight: '700' },
-  address: { color: colors.sub, fontSize: fontSize.body, marginBottom: spacing.sm },
+  chip: { alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 3, borderRadius: radius.pill, backgroundColor: colors.primaryTint },
+  chipText: { color: colors.primary, fontSize: fontSize.caption, fontWeight: '800' },
+  addressRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: spacing.sm },
+  address: { flex: 1, color: colors.ink, fontSize: fontSize.body },
 });

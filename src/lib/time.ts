@@ -131,3 +131,8 @@ export function formatDuration(minutes: number): string {
   if (h && m) return `${h}시간 ${m}분`;
   return h ? `${h}시간` : `${m}분`;
 }
+
+/** 한국 시간 기준 오늘 요일 (0=월 … 6=일) */
+export function kstWeekday(now: Date = new Date()): Weekday {
+  return toKstParts(now).weekday;
+}

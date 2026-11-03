@@ -1,5 +1,5 @@
 /**
- * S16 게임 — 담당: A
+ * S16 게임 — 담당: A (디자인팀 UI 반영: 보라 배너, 게임 카드, '게임 시작' 버튼. 게임은 결정용 5종 유지, 11/3 결정 8번)
  * 채팅방에서 함께 무언가를 정할 때 쓰는 게임 5종 (PRD S16). 결과는 서버가 정하고 모든 참여자가 같은 결과를 본다.
  * 흐름: ① 게임 고르기 → ② 설정(참여자 + 게임별 옵션) → '시작' → ③ 결과
  *       → '다시 하기'(새 결과) 또는 '결과 채팅방에 공유하기'(game_result 메시지) → S12로 돌아감
@@ -15,11 +15,21 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { api, ApiError, type GameRunResult, type MiniUser } from '@/api';
 import { Button } from '@/components/Button';
-import { colors, fontSize, MIN_TOUCH, spacing } from '@/constants/theme';
+import { Icon } from '@/components/Icon';
+import { colors, fontSize, MIN_TOUCH, radius, spacing } from '@/constants/theme';
 import { describeGameResult, GAME_INFO } from '@/lib/gameResult';
 import type { GameType } from '@/types/db';
 
 const GAME_TYPES: GameType[] = ['ladder', 'draw', 'order', 'wheel', 'teams'];
+
+/** 게임 카드 꾸밈 (디자인팀 UI: 색 타일, 태그, 아래 힌트) */
+const GAME_CARD: Record<GameType, { tag: string; tile: string; tagColor: string; hint: string }> = {
+  ladder: { tag: '짝짓기', tile: '#EDE9FE', tagColor: '#7C3AED', hint: '누가 무엇을 맡을까?' },
+  draw: { tag: '뽑기', tile: '#FEF3C7', tagColor: '#D97706', hint: '오늘의 당첨자는?' },
+  order: { tag: '순서', tile: '#DCFCE7', tagColor: '#16A34A', hint: '누가 먼저 할까?' },
+  wheel: { tag: '뽑기', tile: '#FCE7F3', tagColor: '#DB2777', hint: '메뉴 고르기에 딱' },
+  teams: { tag: '팀', tile: '#E0F2FE', tagColor: '#0284C7', hint: '공평하게 팀 나누기' },
+};
 const WHEEL_MIN = 2;
 const WHEEL_MAX = 10;
 
@@ -149,13 +159,13 @@ export default function GameScreen() {
     else router.back();
   };
 
-  const title = step === 'select' ? '게임' : GAME_INFO[type].label;
+  const title = step === 'select' ? '' : GAME_INFO[type].label; // 선택 화면은 배너가 제목 역할
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
       <View style={styles.topBar}>
         <Pressable accessibilityRole="button" accessibilityLabel="뒤로가기" onPress={goBack} style={styles.back} hitSlop={8}>
-          <Text style={styles.backText}>‹</Text>
+          <Icon name="arrow-left" size={24} color={colors.ink} />
         </Pressable>
         <Text style={styles.title} accessibilityRole="header">
           {title}
@@ -171,23 +181,50 @@ export default function GameScreen() {
       ) : !members ? (
         <ActivityIndicator style={styles.center} color={colors.primary} accessibilityLabel="불러오는 중" />
       ) : step === 'select' ? (
-        <ScrollView contentContainerStyle={styles.content}>
-          <Text style={styles.guide}>채팅방 메이트와 함께 정해 보세요</Text>
-          {GAME_TYPES.map((t) => (
-            <Pressable
-              key={t}
-              accessibilityRole="button"
-              accessibilityLabel={`${GAME_INFO[t].label}, ${GAME_INFO[t].description}`}
-              onPress={() => pickGame(t)}
-              style={({ pressed }) => [styles.gameCard, pressed && styles.pressed]}
-            >
-              <Text style={styles.gameEmoji}>{GAME_INFO[t].emoji}</Text>
+        <ScrollView contentContainerStyle={styles.selectContent}>
+          <View style={styles.banner}>
+            <Text style={styles.bannerSmall}>공강메이트와 함께하는</Text>
+            <Text style={styles.bannerTitle}>미니게임 한 판 🎮</Text>
+            <Text style={styles.bannerSmall}>메이트와 함께 정하고 더 가까워져요</Text>
+          </View>
+          <View style={styles.cards}>
+            <Text style={styles.selectTitle}>게임 선택</Text>
+            {GAME_TYPES.map((t) => {
+              const card = GAME_CARD[t];
+              return (
+                <View key={t} style={styles.gameCard}>
+                  <View style={styles.gameTop}>
+                    <View style={[styles.tile, { backgroundColor: card.tile }]}>
+                      <Text style={styles.gameEmoji}>{GAME_INFO[t].emoji}</Text>
+                    </View>
+                    <View style={styles.flex}>
+                      <View style={styles.nameRow}>
+                        <Text style={styles.gameName}>{GAME_INFO[t].label}</Text>
+                        <View style={[styles.tag, { backgroundColor: card.tagColor }]}>
+                          <Text style={styles.tagText}>{card.tag}</Text>
+                        </View>
+                      </View>
+                      <Text style={styles.gameDesc}>{GAME_INFO[t].description}</Text>
+                    </View>
+                  </View>
+                  <View style={styles.gameBottom}>
+                    <View style={styles.hintRow}>
+                      <Icon name="users" size={14} color={colors.sub} />
+                      <Text style={styles.hint}>{card.hint}</Text>
+                    </View>
+                    <Button label="게임 시작" size="sm" onPress={() => pickGame(t)} />
+                  </View>
+                </View>
+              );
+            })}
+            <View style={styles.infoBox}>
+              <Icon name="info" size={18} color={colors.primaryBright} />
               <View style={styles.flex}>
-                <Text style={styles.gameName}>{GAME_INFO[t].label}</Text>
-                <Text style={styles.gameDesc}>{GAME_INFO[t].description}</Text>
+                <Text style={styles.infoTitle}>결과를 채팅방에 공유할 수 있어요</Text>
+                <Text style={styles.infoText}>결과는 서버가 정하고, 모든 메이트에게 같은 결과가 보여요</Text>
               </View>
-            </Pressable>
-          ))}
+            </View>
+          </View>
         </ScrollView>
       ) : step === 'setup' ? (
         <>
@@ -336,25 +373,38 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.sm },
   back: { width: MIN_TOUCH, height: MIN_TOUCH, alignItems: 'center', justifyContent: 'center' },
-  backText: { fontSize: 30, color: colors.ink },
-  title: { color: colors.ink, fontSize: 18, fontWeight: '900' },
+  title: { color: colors.primary, fontSize: 18, fontWeight: '900' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.sm, padding: spacing.lg },
   error: { color: colors.danger, fontSize: fontSize.body },
   content: { padding: spacing.lg, gap: spacing.sm },
   guide: { color: colors.sub, fontSize: fontSize.body, marginBottom: spacing.sm },
+  selectContent: { paddingBottom: spacing.lg },
+  banner: { paddingVertical: spacing.lg, paddingHorizontal: spacing.lg, backgroundColor: colors.primary, alignItems: 'center', gap: 4 },
+  bannerSmall: { color: colors.primaryTint, fontSize: fontSize.caption + 1 },
+  bannerTitle: { color: colors.white, fontSize: 24, fontWeight: '900' },
+  cards: { padding: spacing.lg - 4, gap: spacing.md - 4 },
+  selectTitle: { color: colors.primary, fontSize: fontSize.body + 1, fontWeight: '900' },
   gameCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
+    gap: spacing.md - 4,
     padding: spacing.md,
-    borderRadius: 16,
+    borderRadius: radius.card,
     backgroundColor: colors.white,
-    minHeight: 72,
+    borderWidth: 1,
+    borderColor: colors.line,
   },
-  pressed: { opacity: 0.8 },
-  gameEmoji: { fontSize: 28 },
-  gameName: { color: colors.ink, fontSize: fontSize.body + 1, fontWeight: '700' },
-  gameDesc: { color: colors.sub, fontSize: fontSize.caption },
+  gameTop: { flexDirection: 'row', alignItems: 'center', gap: spacing.md - 4 },
+  tile: { width: 52, height: 52, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  gameEmoji: { fontSize: 26 },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs + 2 },
+  gameName: { color: colors.ink, fontSize: fontSize.body + 1, fontWeight: '800' },
+  tag: { paddingHorizontal: 7, paddingVertical: 1, borderRadius: radius.pill },
+  tagText: { color: colors.white, fontSize: fontSize.caption - 1, fontWeight: '800' },
+  gameDesc: { color: colors.sub, fontSize: fontSize.caption + 1, marginTop: 2 },
+  gameBottom: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  hintRow: { flexDirection: 'row', alignItems: 'center', gap: 4, flex: 1 },
+  infoBox: { flexDirection: 'row', gap: spacing.sm, padding: spacing.md - 2, borderRadius: radius.control, backgroundColor: colors.primaryTint, marginTop: spacing.sm },
+  infoTitle: { color: colors.primary, fontSize: fontSize.caption + 1, fontWeight: '800' },
+  infoText: { color: colors.primaryBright, fontSize: fontSize.caption },
   section: { color: colors.ink, fontSize: fontSize.body, fontWeight: '700', marginTop: spacing.sm },
   hint: { color: colors.sub, fontSize: fontSize.caption },
   hintCenter: { color: colors.sub, fontSize: fontSize.caption, textAlign: 'center' },
@@ -368,9 +418,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
     justifyContent: 'center',
   },
-  personOn: { borderColor: colors.primary, backgroundColor: colors.primaryTint },
+  personOn: { borderColor: colors.primary, backgroundColor: colors.primary },
   personText: { color: colors.ink, fontSize: fontSize.body },
-  personTextOn: { color: colors.primary, fontWeight: '700' },
+  personTextOn: { color: colors.white, fontWeight: '800' },
   input: {
     minHeight: MIN_TOUCH,
     paddingHorizontal: spacing.md,
@@ -401,6 +451,6 @@ const styles = StyleSheet.create({
   stepValue: { minWidth: 32, textAlign: 'center', color: colors.ink, fontSize: 20, fontWeight: '900' },
   footer: { padding: spacing.lg, paddingTop: spacing.sm, gap: spacing.sm },
   resultEmoji: { fontSize: 48, textAlign: 'center', marginTop: spacing.lg },
-  resultCard: { padding: spacing.lg, borderRadius: 16, backgroundColor: colors.white, gap: spacing.sm },
-  resultLine: { color: colors.ink, fontSize: 18, fontWeight: '700', textAlign: 'center' },
+  resultCard: { padding: spacing.lg, borderRadius: radius.card, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.white, gap: spacing.sm },
+  resultLine: { color: colors.primary, fontSize: 19, fontWeight: '800', textAlign: 'center' },
 });
