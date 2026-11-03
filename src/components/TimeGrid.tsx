@@ -8,7 +8,8 @@
  *     <TimeGrid mode="multi" value={ranges} onChange={setRanges} />
  *   </View>
  * - 남은 높이에 맞춰 칸 높이를 정한다. 부모를 ScrollView로 감싸지 말고 flex: 1 공간에 둔다.
- * - 칸 높이가 MIN_ROW_HEIGHT보다 작아져야 할 만큼 좁으면 격자 안에서 세로 스크롤된다.
+ * - 드래그와 스크롤이 겹치지 않도록 격자는 항상 한 화면에 맞춘다 (휴대폰 확인 결과, 11/3).
+ *   칸 높이가 MIN_ROW_HEIGHT(8px)보다 작아져야 할 만큼 아주 좁을 때만 격자 안에서 세로 스크롤된다.
  *   이때는 칸을 잠깐(0.2초) 눌렀다가 끌어야 칠해지고, 바로 끌면 스크롤된다.
  *
  * 동작
@@ -48,7 +49,7 @@ export type TimeGridProps = {
 
 const DAYS = WEEKDAY_COUNT; // 월~금 (11/3 결정)
 const DAY_LABELS = WEEKDAY_LABELS.slice(0, DAYS);
-const MIN_ROW_HEIGHT = 16;
+const MIN_ROW_HEIGHT = 8; // 이보다 좁을 때만 스크롤 (보통 휴대폰에서는 스크롤 없이 한 화면에 들어간다)
 const MAX_ROW_HEIGHT = 32;
 const HEADER_HEIGHT = 40;
 const TIME_COL_WIDTH = 48;
