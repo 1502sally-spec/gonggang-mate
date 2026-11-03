@@ -5,6 +5,7 @@
  * - 방장에게는 대기 중인 채팅 요청 수를 따로 표시한다 (10/31 회의: 방장이 S12에서 수락).
  * - 실시간 갱신: 화면에 들어올 때, 앱으로 돌아올 때, 보고 있는 동안 REFRESH_MS마다 다시 불러온다.
  * - 방장이 약속을 취소해 닫힌 방은 서버가 목록에서 뺀다 (11/3 결정).
+ * 11/3 결정 12번: 1:1 방(kind = 'direct')은 카테고리가 없어서 맨 끝 '1:1' 탭에 모은다.
  * 디자인은 나중에 피그마 반영 예정 (지금은 기능 위주).
  */
 import { router, useFocusEffect } from 'expo-router';
@@ -18,11 +19,17 @@ import { CATEGORIES, categoryInfo, colors, fontSize, MIN_TOUCH, spacing, type Ca
 import { formatDate, kstMinutesOfDay, minutesToTime } from '@/lib/time';
 
 const REFRESH_MS = 15_000;
+
+/** 탭: 게시물 카테고리 4개 + 1:1 방 */
+type Tab = Category | 'direct';
+const TABS: Tab[] = [...CATEGORIES, 'direct'];
+const tabLabel = (t: Tab) => (t === 'direct' ? '1:1' : categoryInfo[t].label);
+const inTab = (r: RoomListItem, t: Tab) => (t === 'direct' ? r.kind === 'direct' : r.kind !== 'direct' && r.category === t);
 const AVATAR_STACK = 3; // 겹쳐 보여 줄 아바타 수
 
 export default function ChatsScreen() {
   const [rooms, setRooms] = useState<RoomListItem[] | null>(null);
-  const [tab, setTab] = useState<Category | null>(null); // null = 아직 안 고름 (처음 불러온 뒤 정한다)
+  const [tab, setTab] = useState<Tab | null>(null); // null = 아직 안 고름 (처음 불러온 뒤 정한다)
   const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async (showError: boolean) => {
@@ -30,7 +37,7 @@ export default function ChatsScreen() {
       const next = await api.rooms.getMyRooms();
       setRooms(next);
       // 처음 들어오면 가장 최근에 대화한 방의 카테고리를 연다 (목록은 최근 메시지 순)
-      setTab((prev) => prev ?? next[0]?.category ?? CATEGORIES[0]);
+      setTab((prev) => prev ?? (next[0] ? (next[0].kind === 'direct' ? 'direct' : (next[0].category ?? CATEGORIES[0])) : CATEGORIES[0]));
     } catch (e) {
       setRooms((prev) => prev ?? []);
       setTab((prev) => prev ?? CATEGORIES[0]);
@@ -68,15 +75,15 @@ export default function ChatsScreen() {
     );
   }
 
-  const visible = rooms.filter((r) => r.category === tab);
-  const unreadOf = (c: Category) => rooms.filter((r) => r.category === c).reduce((sum, r) => sum + r.unread_count + r.pending_request_count, 0);
+  const visible = rooms.filter((r) => inTab(r, tab));
+  const unreadOf = (t: Tab) => rooms.filter((r) => inTab(r, t)).reduce((sum, r) => sum + r.unread_count + r.pending_request_count, 0);
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <Text style={styles.title}>채팅</Text>
 
       <View style={styles.tabs} accessibilityRole="tablist">
-        {CATEGORIES.map((c) => {
+        {TABS.map((c) => {
           const selected = c === tab;
           const count = unreadOf(c);
           return (
@@ -84,11 +91,11 @@ export default function ChatsScreen() {
               key={c}
               accessibilityRole="tab"
               accessibilityState={{ selected }}
-              accessibilityLabel={count > 0 ? `${categoryInfo[c].label}, 새 소식 ${count}개` : categoryInfo[c].label}
+              accessibilityLabel={count > 0 ? `${tabLabel(c)}, 새 소식 ${count}개` : tabLabel(c)}
               onPress={() => setTab(c)}
               style={[styles.tab, selected && styles.tabSelected]}
             >
-              <Text style={[styles.tabText, selected && styles.tabTextSelected]}>{categoryInfo[c].label}</Text>
+              <Text style={[styles.tabText, selected && styles.tabTextSelected]}>{tabLabel(c)}</Text>
               {count > 0 ? <Badge count={count} /> : null}
             </Pressable>
           );
@@ -105,7 +112,9 @@ export default function ChatsScreen() {
         )}
         ListEmptyComponent={
           <Text style={styles.empty}>
-            {categoryInfo[tab].label} 채팅방이 없어요.{'\n'}게시판에서 채팅 요청을 보내거나 글을 써 보세요.
+            {tab === 'direct'
+              ? '1:1 채팅방이 없어요.\n메이트 프로필에서 1:1 채팅을 눌러 보세요.'
+              : `${tabLabel(tab)} 채팅방이 없어요.\n게시판에서 채팅 요청을 보내거나 글을 써 보세요.`}
           </Text>
         }
       />

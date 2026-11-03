@@ -6,6 +6,7 @@
  * - 시스템 메시지(입장·나가기·약속 확정)가 오면 상단 정보(인원, 약속 여부)를 다시 불러온다
  * - 채팅 요청은 실시간 구독이 없어서 보고 있는 동안 REFRESH_MS마다 다시 불러온다
  * - 메뉴: 메이트는 '나가기' (약속이 있으면 약속 취소와 같음, 11/3 결정), 방장은 '게시물 삭제' (약속 확정 전만)
+ * 11/3 결정 12번: 1:1 방(room.kind = 'direct')은 post가 없다. 제목은 상대 닉네임, 대화와 게임만 (약속 확정 없음), 메뉴는 '나가기'만.
  * 디자인은 나중에 피그마 반영 예정 (지금은 기능 위주).
  */
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
@@ -178,6 +179,18 @@ export default function ChatRoomScreen() {
 
   const onMenu = () => {
     if (!room) return;
+    // 1:1 방: 누구나 나갈 수 있다. 상대 프로필의 '1:1 채팅'을 다시 누르면 다시 들어온다
+    if (room.kind === 'direct' || !room.post) {
+      confirmAndLeave(
+        '1:1 채팅방을 나갈까요?',
+        '상대 프로필에서 1:1 채팅을 다시 누르면 다시 들어올 수 있어요.',
+        '나가기',
+        () => api.rooms.leaveRoom(roomId),
+        '채팅방을 나가지 못했어요',
+      );
+      return;
+    }
+    const post = room.post;
     if (room.is_host && room.appointment_id) {
       Alert.alert('방장은 채팅방을 나갈 수 없어요', '약속을 취소하려면 약속카드에서 취소해 주세요.', [
         { text: '닫기', style: 'cancel' },
@@ -188,7 +201,7 @@ export default function ChatRoomScreen() {
         '게시물을 삭제할까요?',
         '방장은 채팅방을 나갈 수 없어서 게시물을 삭제해야 해요. 매칭 목록과 채팅 목록에서 함께 사라져요.',
         '삭제',
-        () => api.posts.deletePost(room.post.id),
+        () => api.posts.deletePost(post.id),
         '게시물을 삭제하지 못했어요',
       );
     } else {
@@ -227,19 +240,23 @@ export default function ChatRoomScreen() {
     );
   }
 
-  const info = room ? categoryInfo[room.post.category] : null;
+  const post = room?.post ?? null; // 1:1 방이면 null
+  const isDirect = room?.kind === 'direct';
+  const info = post ? categoryInfo[post.category] : null;
   const full = !!room && room.members.length >= room.max_members;
+  const headerTitle = isDirect ? (room?.partner?.nickname ?? '1:1 채팅') : (post?.title ?? '채팅방');
+  const headerSubtitle = isDirect
+    ? '1:1 채팅'
+    : room && post && info
+      ? `${info.label} · ${formatDateRange(post.start_at, post.end_at)} · ${room.members.length}/${room.max_members}명`
+      : undefined;
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <Header
-          title={room?.post.title ?? '채팅방'}
-          subtitle={
-            room && info
-              ? `${info.label} · ${formatDateRange(room.post.start_at, room.post.end_at)} · ${room.members.length}/${room.max_members}명`
-              : undefined
-          }
+          title={headerTitle}
+          subtitle={headerSubtitle}
           onBack={() => router.back()}
           onMenu={room ? onMenu : undefined}
         />
@@ -253,7 +270,7 @@ export default function ChatRoomScreen() {
               <View style={styles.action}>
                 <Button label="약속카드 보기" variant="secondary" onPress={() => router.push('/appointments')} />
               </View>
-            ) : room.is_host ? (
+            ) : room.is_host && !isDirect ? (
               <View style={styles.action}>
                 <Button label="약속 확정" onPress={() => setConfirmOpen(true)} />
               </View>
