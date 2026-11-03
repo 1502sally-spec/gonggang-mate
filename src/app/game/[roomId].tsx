@@ -17,19 +17,9 @@ import { api, ApiError, type GameRunResult, type MiniUser } from '@/api';
 import { Button } from '@/components/Button';
 import { Icon } from '@/components/Icon';
 import { colors, fontSize, MIN_TOUCH, radius, spacing } from '@/constants/theme';
-import { describeGameResult, GAME_INFO } from '@/lib/gameResult';
+import { describeGameResult, GAME_CARD, GAME_INFO, GAME_TYPES } from '@/lib/gameResult';
 import type { GameType } from '@/types/db';
 
-const GAME_TYPES: GameType[] = ['ladder', 'draw', 'order', 'wheel', 'teams'];
-
-/** 게임 카드 꾸밈 (디자인팀 UI: 색 타일, 태그, 아래 힌트) */
-const GAME_CARD: Record<GameType, { tag: string; tile: string; tagColor: string; hint: string }> = {
-  ladder: { tag: '짝짓기', tile: '#EDE9FE', tagColor: '#7C3AED', hint: '누가 무엇을 맡을까?' },
-  draw: { tag: '뽑기', tile: '#FEF3C7', tagColor: '#D97706', hint: '오늘의 당첨자는?' },
-  order: { tag: '순서', tile: '#DCFCE7', tagColor: '#16A34A', hint: '누가 먼저 할까?' },
-  wheel: { tag: '뽑기', tile: '#FCE7F3', tagColor: '#DB2777', hint: '메뉴 고르기에 딱' },
-  teams: { tag: '팀', tile: '#E0F2FE', tagColor: '#0284C7', hint: '공평하게 팀 나누기' },
-};
 const WHEEL_MIN = 2;
 const WHEEL_MAX = 10;
 
@@ -38,11 +28,13 @@ type Step = 'select' | 'setup' | 'result';
 const errorMessage = (e: unknown, fallback: string) => (e instanceof ApiError ? e.message : fallback);
 
 export default function GameScreen() {
-  const { roomId } = useLocalSearchParams<{ roomId: string }>();
+  // type을 주면(채팅방의 미니게임 선택창) 게임 선택을 건너뛰고 바로 설정 화면으로
+  const { roomId, type: initialType } = useLocalSearchParams<{ roomId: string; type?: GameType }>();
+  const startType = initialType && GAME_TYPES.includes(initialType) ? initialType : null;
   const [members, setMembers] = useState<MiniUser[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [step, setStep] = useState<Step>('select');
-  const [type, setType] = useState<GameType>('ladder');
+  const [step, setStep] = useState<Step>(startType ? 'setup' : 'select');
+  const [type, setType] = useState<GameType>(startType ?? 'ladder');
 
   // 설정
   const [participantIds, setParticipantIds] = useState<string[]>([]);
@@ -155,7 +147,7 @@ export default function GameScreen() {
 
   const goBack = () => {
     if (step === 'result') setStep('setup');
-    else if (step === 'setup') setStep('select');
+    else if (step === 'setup' && !startType) setStep('select');
     else router.back();
   };
 

@@ -11,8 +11,9 @@ type Props = {
    * secondary: 연보라 버튼 (보조 동작: 일정 변경, 채팅방 가기 등)
    * outline: 흰 바탕 + 보라 테두리 (차단하기, 취소 등)
    * danger: 흰 바탕 + 빨간 테두리 (약속 취소 등 되돌리기 어려운 동작)
+   * muted: 회색 버튼 (약속카드의 '취소' 등 덜 강조할 동작)
    */
-  variant?: 'primary' | 'bright' | 'secondary' | 'outline' | 'danger';
+  variant?: 'primary' | 'bright' | 'secondary' | 'outline' | 'danger' | 'muted';
   /** 작은 버튼 (카드 안 '게임 시작', '인증요청' 등) */
   size?: 'md' | 'sm';
   disabled?: boolean;
@@ -54,6 +55,7 @@ const styles = StyleSheet.create({
   secondary: { backgroundColor: colors.primaryTint },
   outline: { backgroundColor: colors.white, borderWidth: 1.5, borderColor: colors.primary },
   danger: { backgroundColor: colors.white, borderWidth: 1.5, borderColor: colors.danger },
+  muted: { backgroundColor: '#E5E7EB' },
   disabled: { opacity: 0.4 },
   pressed: { opacity: 0.85 },
   label: { fontSize: fontSize.body + 1, fontWeight: '700' },
@@ -66,4 +68,5 @@ const labelStyles = StyleSheet.create({
   secondary: { color: colors.primary },
   outline: { color: colors.primary },
   danger: { color: colors.danger },
+  muted: { color: colors.ink },
 });

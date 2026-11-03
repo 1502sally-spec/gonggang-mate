@@ -1,17 +1,20 @@
 /**
- * S13 메이트 정보 팝업 — 채팅방(S12)에서 프로필 사진을 누르면 뜬다.
+ * S13 상대 프로필 — 채팅방(S12)에서 프로필 사진을 누르면 뜬다.
+ * 디자인팀 UI 반영(11/4, A): 아래 팝업 대신 전체 화면. 프로필 카드, 받은 메이트 하트, 대표 후기, '1:1 채팅' 버튼.
+ * 쓰는 쪽 입력값(userId, onClose, onBlocked)은 그대로다. 관심활동·학과는 넣지 않는다 (11/3 결정 6번, 데이터 없음).
  * 후기는 누가 남겼는지 숨기고 항목별 합계만 보여 준다. 내 정보에는 '차단' 버튼이 없다.
  * 11/3 추가: 현재 활동 중 표시(최근 15분), '1:1 채팅' 버튼(같은 두 사람의 방은 하나, 차단 사이엔 정보 자체가 안 보임)
  */
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
 import { api, ApiError, type MateInfo } from '@/api';
 import { Avatar } from '@/components/Avatar';
 import { Button } from '@/components/Button';
-import { BottomSheet } from '@/components/popups/BottomSheet';
-import { colors, fontSize, spacing } from '@/constants/theme';
+import { Icon } from '@/components/Icon';
+import { colors, fontSize, radius, spacing } from '@/constants/theme';
 import { REVIEW_ITEMS } from '@/types/db';
 
 const GENDER_LABELS: Record<MateInfo['gender'], string> = { male: '남성', female: '여성' };
@@ -85,73 +88,154 @@ export function MateInfoPopup({ userId, onClose, onBlocked }: Props) {
     ]);
   };
 
+  // 가장 많이 받은 후기 (대표 후기)
+  const top = info
+    ? REVIEW_ITEMS.map((item) => ({ ...item, count: info.review_counts[item.key] ?? 0 })).sort((a, b) => b.count - a.count)[0]
+    : null;
+
   return (
-    <BottomSheet visible={userId !== null} onClose={onClose} title="메이트 정보">
-      {error ? (
-        <Text style={styles.error}>{error}</Text>
-      ) : !info ? (
-        <ActivityIndicator color={colors.primary} style={styles.loading} />
-      ) : (
-        <ScrollView contentContainerStyle={styles.body}>
-          <View style={styles.profile}>
-            <Avatar nickname={info.nickname} photoUrl={info.photo_url} size={64} />
-            <View style={styles.profileText}>
-              <View style={styles.nameRow}>
-                <Text style={styles.nickname}>{info.nickname}</Text>
-                {info.is_active ? (
-                  <View style={styles.active} accessibilityLabel="현재 활동 중">
-                    <View style={styles.activeDot} />
-                    <Text style={styles.activeText}>활동 중</Text>
+    <Modal visible={userId !== null} animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>
+      <SafeAreaProvider>
+        <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
+          <View style={styles.topBar}>
+            <Pressable accessibilityRole="button" accessibilityLabel="뒤로가기" onPress={onClose} style={styles.back} hitSlop={8}>
+              <Icon name="arrow-left" size={24} color={colors.ink} />
+            </Pressable>
+          </View>
+
+          {error ? (
+            <Text style={styles.error}>{error}</Text>
+          ) : !info ? (
+            <ActivityIndicator color={colors.primary} style={styles.loading} />
+          ) : (
+            <>
+              <ScrollView contentContainerStyle={styles.body}>
+                <Text style={styles.title} accessibilityRole="header">
+                  {isMe ? '내 프로필' : '상대 프로필'}
+                </Text>
+                <Text style={styles.subtitle}>공강메이트 정보를 확인해보세요</Text>
+
+                {/* 프로필 카드 */}
+                <View style={styles.card}>
+                  <View style={styles.profile}>
+                    <Avatar nickname={info.nickname} photoUrl={info.photo_url} size={64} />
+                    <View style={styles.profileText}>
+                      <Text style={styles.nickname}>{info.nickname}</Text>
+                      <View style={styles.metaRow}>
+                        <Text style={styles.sub}>{GENDER_LABELS[info.gender]}</Text>
+                        {info.is_active ? (
+                          <View style={styles.active} accessibilityLabel="현재 활동 중">
+                            <View style={styles.activeDot} />
+                            <Text style={styles.activeText}>활동 중</Text>
+                          </View>
+                        ) : null}
+                      </View>
+                    </View>
                   </View>
-                ) : null}
-              </View>
-              <Text style={styles.sub}>{GENDER_LABELS[info.gender]}</Text>
-              {info.bio ? <Text style={styles.bio}>{info.bio}</Text> : null}
-            </View>
-          </View>
+                  <View style={styles.divider} />
+                  <View style={styles.field}>
+                    <Text style={styles.fieldLabel}>한줄소개</Text>
+                    <Text style={styles.fieldValue}>{info.bio || '아직 한줄소개가 없어요'}</Text>
+                  </View>
+                  <View style={styles.field}>
+                    <Text style={styles.fieldLabel}>만남</Text>
+                    <Text style={styles.fieldValue}>{info.meet_count}회</Text>
+                  </View>
+                </View>
 
-          <View style={styles.stats}>
-            <Text style={styles.heart}>♥ 메이트 하트 {info.heart_count}개</Text>
-            <Text style={styles.sub}>만남 {info.meet_count}회</Text>
-          </View>
+                {/* 받은 메이트 하트 */}
+                <View style={[styles.card, styles.heartCard]}>
+                  <View style={styles.iconCircle}>
+                    <Icon name="heart" size={18} color={colors.primary} />
+                  </View>
+                  <Text style={styles.heartLabel}>받은 메이트 하트</Text>
+                  <Text style={styles.heartCount}>
+                    {info.heart_count}
+                    <Text style={styles.heartUnit}> 개</Text>
+                  </Text>
+                </View>
 
-          <View style={styles.reviews}>
-            <Text style={styles.reviewTitle}>받은 후기</Text>
-            {REVIEW_ITEMS.map(({ key, label }) => (
-              <View key={key} style={styles.reviewRow}>
-                <Text style={styles.reviewLabel}>{label}</Text>
-                <Text style={styles.reviewCount}>{info.review_counts[key]}</Text>
-              </View>
-            ))}
-          </View>
-        </ScrollView>
-      )}
+                {/* 대표 후기 + 항목별 받은 횟수 (누가 남겼는지는 숨김) */}
+                <Text style={styles.sectionTitle}>대표 후기</Text>
+                <View style={styles.card}>
+                  <View style={styles.topReview}>
+                    <View style={styles.iconCircle}>
+                      <Icon name="star" size={16} color={colors.primary} />
+                    </View>
+                    <View style={styles.flex}>
+                      <Text style={top && top.count > 0 ? styles.topReviewText : styles.muted}>
+                        {top && top.count > 0 ? top.label : '아직 받은 후기가 없어요'}
+                      </Text>
+                      {top && top.count > 0 ? <Text style={styles.topReviewSub}>가장 많이 받은 후기</Text> : null}
+                    </View>
+                  </View>
+                  {REVIEW_ITEMS.some(({ key }) => info.review_counts[key] > 0) ? (
+                    <View style={styles.reviews}>
+                      {REVIEW_ITEMS.map(({ key, label }) => (
+                        <View key={key} style={styles.reviewRow}>
+                          <Text style={styles.reviewLabel}>{label}</Text>
+                          <Text style={styles.reviewCount}>{info.review_counts[key]}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  ) : null}
+                </View>
+              </ScrollView>
 
-      {info && !isMe ? <Button label="1:1 채팅" onPress={onDirectChat} disabled={busy} /> : null}
-      {info && !isMe ? <Button label={busy ? '처리 중...' : '차단'} variant="danger" onPress={onBlock} disabled={busy} /> : null}
-      <Button label="닫기" variant="secondary" onPress={onClose} />
-    </BottomSheet>
+              {!isMe ? (
+                <View style={styles.footer}>
+                  <Button label="1:1 채팅 하기" onPress={onDirectChat} disabled={busy} />
+                  <Pressable accessibilityRole="button" onPress={onBlock} disabled={busy} style={styles.blockLink} hitSlop={8}>
+                    <Text style={styles.blockText}>{busy ? '처리 중...' : '차단하기'}</Text>
+                  </Pressable>
+                </View>
+              ) : null}
+            </>
+          )}
+        </SafeAreaView>
+      </SafeAreaProvider>
+    </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  loading: { marginVertical: spacing.lg },
-  error: { color: colors.danger, fontSize: fontSize.body, marginVertical: spacing.md },
-  body: { gap: spacing.md, paddingBottom: spacing.sm },
+  safe: { flex: 1, backgroundColor: colors.bg },
+  flex: { flex: 1 },
+  topBar: { minHeight: 48, paddingHorizontal: spacing.sm, justifyContent: 'center' },
+  back: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  loading: { marginTop: spacing.lg * 2 },
+  error: { color: colors.danger, fontSize: fontSize.body, margin: spacing.lg },
+  body: { paddingHorizontal: spacing.lg - 4, paddingBottom: spacing.lg, gap: spacing.md - 2 },
+  title: { color: colors.primary, fontSize: fontSize.title + 2, fontWeight: '900' },
+  subtitle: { color: colors.sub, fontSize: fontSize.body - 1, marginTop: -spacing.sm },
+  card: { padding: spacing.md, gap: spacing.md - 4, borderRadius: radius.card, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.white },
   profile: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  profileText: { flex: 1, gap: 2 },
-  nameRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  nickname: { color: colors.ink, fontSize: fontSize.body, fontWeight: '900' },
-  active: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999, backgroundColor: colors.primaryTint },
+  profileText: { flex: 1, gap: 4 },
+  nickname: { color: colors.primary, fontSize: 20, fontWeight: '900' },
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  sub: { color: colors.sub, fontSize: fontSize.body - 1 },
+  active: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 2, borderRadius: radius.pill, backgroundColor: colors.primaryTint },
   activeDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.success },
   activeText: { color: colors.primary, fontSize: fontSize.caption, fontWeight: '700' },
-  sub: { color: colors.sub, fontSize: fontSize.caption + 1 },
-  bio: { color: colors.ink, fontSize: fontSize.caption + 1 },
-  stats: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  heart: { color: colors.alert, fontSize: fontSize.body, fontWeight: '700' },
-  reviews: { gap: spacing.xs },
-  reviewTitle: { color: colors.ink, fontSize: fontSize.caption + 1, fontWeight: '700' },
+  divider: { height: 1, backgroundColor: colors.line },
+  field: { gap: 2 },
+  fieldLabel: { color: colors.sub, fontSize: fontSize.caption },
+  fieldValue: { color: colors.ink, fontSize: fontSize.body, fontWeight: '700' },
+  heartCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.md - 4 },
+  iconCircle: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.primaryTint, alignItems: 'center', justifyContent: 'center' },
+  heartLabel: { flex: 1, color: colors.ink, fontSize: fontSize.body, fontWeight: '800' },
+  heartCount: { color: colors.primary, fontSize: 22, fontWeight: '900' },
+  heartUnit: { color: colors.ink, fontSize: fontSize.body - 1, fontWeight: '600' },
+  sectionTitle: { color: colors.ink, fontSize: fontSize.body + 1, fontWeight: '800', marginBottom: -spacing.xs },
+  topReview: { flexDirection: 'row', alignItems: 'center', gap: spacing.md - 4 },
+  topReviewText: { color: colors.primary, fontSize: fontSize.body, fontWeight: '800' },
+  topReviewSub: { color: colors.sub, fontSize: fontSize.caption },
+  muted: { color: colors.sub, fontSize: fontSize.body - 1 },
+  reviews: { gap: 6, paddingTop: spacing.sm, borderTopWidth: 1, borderTopColor: colors.line },
   reviewRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
   reviewLabel: { flex: 1, color: colors.sub, fontSize: fontSize.caption + 1 },
-  reviewCount: { color: colors.ink, fontSize: fontSize.caption + 1, fontWeight: '700' },
+  reviewCount: { color: colors.primary, fontSize: fontSize.caption + 1, fontWeight: '800' },
+  footer: { paddingHorizontal: spacing.lg - 4, paddingTop: spacing.sm, paddingBottom: spacing.sm, gap: spacing.xs, alignItems: 'stretch' },
+  blockLink: { alignSelf: 'center', paddingVertical: spacing.sm },
+  blockText: { color: colors.sub, fontSize: fontSize.body - 1, textDecorationLine: 'underline' },
 });
