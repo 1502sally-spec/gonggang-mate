@@ -63,3 +63,25 @@ export async function getMateInfo(userId: string): Promise<MateInfo> {
   if (error) throw toApiError(error, '메이트 정보를 불러오지 못했어요');
   return data as MateInfo;
 }
+
+/** S03 '중복 확인': 닉네임을 쓸 수 있는지. 형식(2~10자) 검사는 화면에서 먼저 한다 */
+export async function isNicknameAvailable(nickname: string): Promise<boolean> {
+  if (USE_MOCK_API) return mock.isNicknameAvailable(nickname);
+  const { data: session } = await sb().auth.getSession();
+  let query = sb().from('users').select('id').eq('nickname', nickname.trim()).limit(1);
+  if (session.session?.user.id) query = query.neq('id', session.session.user.id);
+  const { data, error } = await query;
+  if (error) throw toApiError(error, '닉네임을 확인하지 못했어요');
+  return (data ?? []).length === 0;
+}
+
+/**
+ * 현재 활동 여부 신호 (11/3 결정). 앱이 켜져 있는 동안 ACTIVE_PING_MINUTES마다 부른다 (src/app/_layout.tsx).
+ * 최근 15분 안에 신호가 있으면 다른 사람에게 '활동 중'으로 보인다. 로그인 전이거나 실패해도 조용히 넘어간다
+ */
+export async function touchActive(): Promise<void> {
+  if (USE_MOCK_API) return mock.touchActive();
+  const { data } = await sb().auth.getSession();
+  if (!data.session) return;
+  await sb().rpc('touch_active');
+}

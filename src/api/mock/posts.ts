@@ -1,6 +1,6 @@
 /** 가짜 게시물·매칭 목록 (api/posts.ts의 USE_MOCK_API 모드). Supabase 연결 후 지운다. */
 import { ApiError, type CreatePostInput, type MyRequestStatus, type PostListItem } from '@/api/types';
-import { blockedUserIdsOf, requireMeId, roomMemberIds, toMini } from '@/api/mock/helpers';
+import { blockedUserIdsOf, requireMeId, roomMemberIds, toMini, isUserActive } from '@/api/mock/helpers';
 import { copy, db, delay, newId, nowIso } from '@/api/mock/store';
 import { MAX_ROOM_MEMBERS, POST_CONTENT_MAX, POST_TITLE_MAX } from '@/constants/config';
 import { nextOccurrence, slotsToRanges, timeToMinutes } from '@/lib/time';
@@ -54,7 +54,7 @@ export async function createPost(input: CreatePostInput): Promise<{ post: PostLi
     status: 'open',
     created_at: nowIso(),
   };
-  const room = { id: newId('r'), post_id: post.id, host_id: meId, created_at: post.created_at };
+  const room = { id: newId('r'), kind: 'post' as const, post_id: post.id, host_id: meId, direct_key: null, created_at: post.created_at };
   db.posts.push(post);
   db.rooms.push(room);
   db.members.push({ room_id: room.id, user_id: meId, joined_at: post.created_at, last_read_message_id: null });
@@ -89,6 +89,7 @@ function toListItem(p: Post, meId: string): PostListItem {
     end_at: p.end_at,
     thumbnail_url: null,
     author: toMini(p.author_id),
+    author_is_active: isUserActive(p.author_id),
     member_count: roomMemberIds(room.id).length,
     max_members: MAX_ROOM_MEMBERS,
     is_mine: p.author_id === meId,

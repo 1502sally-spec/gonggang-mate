@@ -1,6 +1,6 @@
 /** 가짜 프로필·메이트 정보 (api/users.ts의 USE_MOCK_API 모드). Supabase 연결 후 지운다. */
 import { ApiError, type MateInfo, type Me, type ProfileInput } from '@/api/types';
-import { blockedUserIdsOf, findUser, requireMeId } from '@/api/mock/helpers';
+import { blockedUserIdsOf, findUser, isUserActive, requireMeId } from '@/api/mock/helpers';
 import { copy, db, delay } from '@/api/mock/store';
 import { BIO_MAX_LENGTH, NICKNAME_MAX_LENGTH, NICKNAME_MIN_LENGTH } from '@/constants/config';
 import { REVIEW_ITEMS, type ReviewItemKey } from '@/types/db';
@@ -51,7 +51,21 @@ export async function getMateInfo(userId: string): Promise<MateInfo> {
     bio: u.bio,
     photo_url: u.photo_url,
     heart_count: u.heart_count,
+    is_active: isUserActive(u.id),
     meet_count,
     review_counts,
   });
+}
+
+/** S03: 닉네임을 쓸 수 있는지 (중복 확인 버튼) */
+export async function isNicknameAvailable(nickname: string): Promise<boolean> {
+  await delay(200);
+  const meId = db.session.userId;
+  return !db.users.some((u) => u.id !== meId && u.nickname === nickname.trim());
+}
+
+/** 활동 신호 (앱이 켜져 있는 동안 몇 분마다) */
+export async function touchActive(): Promise<void> {
+  const meId = db.session.userId;
+  if (meId) db.activeAt[meId] = Date.now();
 }

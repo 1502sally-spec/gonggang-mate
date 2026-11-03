@@ -127,7 +127,14 @@ function seed() {
   };
   posts.push(pastPost, upcomingPost);
 
-  const rooms: ChatRoom[] = posts.map((p) => ({ id: `r-${p.id.slice(2)}`, post_id: p.id, host_id: p.author_id, created_at: createdAt }));
+  const rooms: ChatRoom[] = posts.map((p) => ({
+    id: `r-${p.id.slice(2)}`,
+    kind: 'post' as const,
+    post_id: p.id,
+    host_id: p.author_id,
+    direct_key: null,
+    created_at: createdAt,
+  }));
 
   const members: ChatMember[] = [
     ...rooms.map((r) => ({ room_id: r.id, user_id: r.host_id, joined_at: createdAt, last_read_message_id: null })),
@@ -174,6 +181,8 @@ function seed() {
   return {
     users,
     session: { userId: ME_ID as string | null },
+    // 마지막 활동 시각(ms). 초밥러버·밥심은 지금 활동 중, 산책러는 오래전
+    activeAt: { [ME_ID]: Date.now(), 'u-1': Date.now(), 'u-2': Date.now(), 'u-3': Date.now() - 60 * 60_000 } as Record<string, number>,
     pendingEmailCodes: new Map<string, string>(),
     verifiedEmails: new Set<string>(),
     freeSlots: slots,

@@ -1,6 +1,7 @@
 /**
  * S15 약속카드 — 담당: C
  * PRD: 다가오는 약속('약속 취소' 버튼, 확인 팝업) / 지난 약속('후기작성' → S17).
+ * 11/3 추가: '일정 변경'(방장만, 시작 전 → 약속 확정 팝업을 변경 모드로), '완료 및 후기'(약속 시작 이후 → S17).
  * 탭 숫자 배지는 (tabs)/_layout.tsx. 만남 30분 전 알림은 아직 없다 (api/appointments.ts TODO).
  * 디자인은 나중에 피그마 반영 예정 (지금은 기능 위주).
  */
@@ -12,6 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { api, ApiError, type AppointmentItem, type MyAppointments } from '@/api';
 import { Avatar } from '@/components/Avatar';
 import { Button } from '@/components/Button';
+import { ConfirmAppointmentPopup } from '@/components/popups/ConfirmAppointmentPopup';
 import { categoryInfo, colors, fontSize, spacing } from '@/constants/theme';
 import { formatDateRange, formatTimeLeft } from '@/lib/time';
 
@@ -20,6 +22,8 @@ export default function AppointmentsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [now, setNow] = useState(0); // 마지막으로 불러온 시각. 남은 시간 표시용
+  const [editing, setEditing] = useState<AppointmentItem | null>(null); // '일정 변경' 중인 약속
+  const closeEdit = useCallback(() => setEditing(null), []);
 
   const load = useCallback(async () => {
     try {
@@ -93,14 +97,38 @@ export default function AppointmentsScreen() {
         stickySectionHeadersEnabled={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         renderSectionHeader={({ section }) => <Text style={styles.sectionTitle}>{section.title}</Text>}
-        renderItem={({ item }) => <AppointmentCard item={item} now={now} busy={busyId === item.id} onCancel={() => onCancel(item)} />}
+        renderItem={({ item }) => (
+          <AppointmentCard item={item} now={now} busy={busyId === item.id} onCancel={() => onCancel(item)} onReschedule={() => setEditing(item)} />
+        )}
         ListEmptyComponent={<Text style={styles.empty}>아직 약속이 없어요.{'\n'}채팅방에서 약속을 확정하면 여기에 카드가 생겨요.</Text>}
+      />
+      <ConfirmAppointmentPopup
+        visible={editing !== null}
+        roomId={editing?.room_id ?? ''}
+        appointment={editing}
+        onClose={closeEdit}
+        onConfirmed={() => {
+          setEditing(null);
+          load();
+        }}
       />
     </SafeAreaView>
   );
 }
 
-function AppointmentCard({ item, now, busy, onCancel }: { item: AppointmentItem; now: number; busy: boolean; onCancel: () => void }) {
+function AppointmentCard({
+  item,
+  now,
+  busy,
+  onCancel,
+  onReschedule,
+}: {
+  item: AppointmentItem;
+  now: number;
+  busy: boolean;
+  onCancel: () => void;
+  onReschedule: () => void;
+}) {
   const info = categoryInfo[item.category];
   const canceled = item.status === 'canceled';
   const ended = new Date(item.end_at).getTime() <= now;
@@ -133,12 +161,13 @@ function AppointmentCard({ item, now, busy, onCancel }: { item: AppointmentItem;
       {canceled ? null : (
         <View style={styles.actions}>
           <Button label="채팅방 가기" variant="secondary" onPress={() => router.push({ pathname: '/chat/[roomId]', params: { roomId: item.room_id } })} />
+          {item.can_reschedule ? <Button label="일정 변경" variant="secondary" onPress={onReschedule} disabled={busy} /> : null}
           {item.can_cancel ? <Button label={busy ? '취소 중...' : '약속 취소'} variant="danger" onPress={onCancel} disabled={busy} /> : null}
-          {ended && hasMates ? (
+          {item.can_complete && hasMates ? (
             item.review_done ? (
               <Text style={styles.reviewDone}>후기 완료</Text>
             ) : (
-              <Button label="후기작성" onPress={() => router.push({ pathname: '/review/[appointmentId]', params: { appointmentId: item.id } })} />
+              <Button label="완료 및 후기" onPress={() => router.push({ pathname: '/review/[appointmentId]', params: { appointmentId: item.id } })} />
             )
           ) : null}
         </View>

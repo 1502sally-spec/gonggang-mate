@@ -2,6 +2,7 @@
 import type { MiniUser } from '@/api/types';
 import { ApiError } from '@/api/types';
 import { db } from '@/api/mock/store';
+import { ACTIVE_WITHIN_MINUTES } from '@/constants/config';
 
 export function requireMeId(): string {
   const id = db.session.userId;
@@ -37,4 +38,10 @@ export function findRoom(roomId: string) {
 
 export function requireMember(roomId: string, userId: string) {
   if (!roomMemberIds(roomId).includes(userId)) throw new ApiError('이 채팅방 참여자가 아니에요', 'not_allowed');
+}
+
+/** 최근 ACTIVE_WITHIN_MINUTES(15분) 안에 활동했는지 */
+export function isUserActive(userId: string): boolean {
+  const at = db.activeAt[userId];
+  return !!at && Date.now() - at < ACTIVE_WITHIN_MINUTES * 60_000;
 }

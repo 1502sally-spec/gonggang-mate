@@ -13,6 +13,7 @@ export const colors = {
   bg: '#F6F7FB', // 화면 배경
   white: '#FFFFFF',
   alert: '#C2410C', // 알림 배지, 하트
+  success: '#2F9E44', // 활동 중 점
   danger: '#C92A2A', // 차단
 } as const;
 

@@ -1,6 +1,7 @@
 /**
  * 후기·메이트 하트 (S17 후기작성) — PRD 7.4
- * 5문항 중 HEART_THRESHOLD(4)개 이상 체크하면 받은 사람의 하트 +1. 하트는 서버 함수에서만 올린다
+ * 5문항 중 HEART_THRESHOLD(3)개 이상 체크하면 받은 사람의 하트 +1. 하트는 서버 함수에서만 올린다 (11/3 결정)
+ * 약속이 시작된 뒤부터 쓸 수 있다 (약속카드 '완료 및 후기' 버튼)
  * 한 약속에서 한 메이트에게 1회, 수정 불가: supabase/migrations/*_reviews_mate_info.sql
  */
 import * as mock from '@/api/mock/reviews';

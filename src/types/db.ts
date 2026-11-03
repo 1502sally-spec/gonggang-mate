@@ -67,10 +67,15 @@ export interface PostPhoto {
   sort_order: number;
 }
 
+/** 채팅방 종류: post = 게시물 그룹 방, direct = 1:1 방 (11/3 결정. 1:1 방은 대화와 게임만, 약속 확정 없음) */
+export type RoomKind = 'post' | 'direct';
+
 export interface ChatRoom {
   id: string;
-  post_id: string;
-  host_id: string; // 방장
+  kind: RoomKind;
+  post_id: string | null; // 1:1 방은 null
+  host_id: string; // 게시물 방의 방장 (1:1 방은 처음 연 사람, 방장 권한 없음)
+  direct_key: string | null; // 1:1 방: 두 사람 id를 정렬해 이은 값 (같은 두 사람의 방은 하나)
   created_at: Timestamp;
 }
 
@@ -127,13 +132,13 @@ export interface AppointmentMember {
   canceled_at: Timestamp | null; // 이 사용자가 약속을 취소한 시각
 }
 
-/** 후기 5문항 (PRD S17, 이 순서로 표시) */
+/** 후기 5문항 (11/3 결정: 디자인 문항, 이 순서로 표시) */
 export const REVIEW_ITEMS = [
+  { key: 'communication', label: '연락이 잘 되고 소통이 편해요' },
   { key: 'on_time', label: '시간 약속을 잘 지켜요' },
-  { key: 'meet_again', label: '다시 만나고 싶어요' },
-  { key: 'kind_manner', label: '친절하고 매너가 좋아요' },
-  { key: 'profile_match', label: '프로필 소개와 실제가 같았어요' },
-  { key: 'kept_budget', label: '정한 예산을 잘 지켰어요' },
+  { key: 'kind_manner', label: '친절하고 배려가 넘쳐요' },
+  { key: 'ice_breaker', label: '처음 만나도 어색하지 않게 이끌어줘요' },
+  { key: 'meet_again', label: '다음에도 공강이 겹치면 또 만나고 싶어요' },
 ] as const;
 
 export type ReviewItemKey = (typeof REVIEW_ITEMS)[number]['key'];

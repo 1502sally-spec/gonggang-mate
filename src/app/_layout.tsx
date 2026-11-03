@@ -1,8 +1,36 @@
 import { Stack } from 'expo-router';
+import { useEffect } from 'react';
+import { AppState } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
+import { api } from '@/api';
+import { ACTIVE_PING_MINUTES } from '@/constants/config';
 import { colors } from '@/constants/theme';
+
+/** 현재 활동 여부 신호 (11/3 결정): 앱이 화면에 떠 있는 동안 몇 분마다 보낸다. 실패해도 조용히 넘어간다 */
+function useActivePing() {
+  useEffect(() => {
+    const ping = () => {
+      api.users.touchActive().catch(() => {});
+    };
+    let timer: ReturnType<typeof setInterval> | null = null;
+    const start = () => {
+      ping();
+      if (!timer) timer = setInterval(ping, ACTIVE_PING_MINUTES * 60_000);
+    };
+    const stop = () => {
+      if (timer) clearInterval(timer);
+      timer = null;
+    };
+    start();
+    const sub = AppState.addEventListener('change', (state) => (state === 'active' ? start() : stop()));
+    return () => {
+      stop();
+      sub.remove();
+    };
+  }, []);
+}
 
 /**
  * 앱 전체 이동 틀 (PRD 5장)
@@ -10,6 +38,8 @@ import { colors } from '@/constants/theme';
  * - 나머지: 하단 네비 없이 위에 쌓이는 화면
  */
 export default function RootLayout() {
+  useActivePing();
+
   return (
     // 드래그(TimeGrid 등)를 쓰려면 앱 전체를 GestureHandlerRootView로 감싼다
     <GestureHandlerRootView style={{ flex: 1 }}>
