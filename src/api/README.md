@@ -28,12 +28,12 @@ try {
 | 파일 | 함수 | 쓰는 화면 |
 |---|---|---|
 | `auth` | `getSession` `isAllowedEmail` `sendEmailCode` `verifyEmailCode` `signUp` `logIn` `logOut` | S01~S03 |
-| `users` | `getMe` `updateMe` `getMateInfo` | S04, S05, S13 |
+| `users` | `getMe` `updateMe` `getMateInfo` `isNicknameAvailable` `touchActive` | S03, S04, S05, S13, 앱 전체(활동 신호) |
 | `freeSlots` | `getMyFreeRanges` `saveMyFreeRanges` | S05, S06, S08 |
 | `posts` | `getMatchingList` `getMatchingCounts` `createPost` `deletePost` | S05, S07, S08 |
-| `rooms` | `requestJoin` `cancelJoinRequest` `getJoinRequests` `respondJoinRequest` `getMyRooms` `getRoom` `leaveRoom` | S07, S11, S12 |
+| `rooms` | `requestJoin` `cancelJoinRequest` `getJoinRequests` `respondJoinRequest` `getMyRooms` `getRoom` `leaveRoom` `openDirectRoom` | S07, S11, S12, S13 |
 | `messages` | `getMessages` `sendMessage` `subscribeMessages` `markRead` | S12 |
-| `appointments` | `confirmAppointment` `getMyAppointments` `cancelAppointment` `getUnseenAppointmentCount` `markAppointmentsSeen` | S14, S15, 하단 탭 배지 |
+| `appointments` | `confirmAppointment` `updateAppointment` `getMyAppointments` `cancelAppointment` `getUnseenAppointmentCount` `markAppointmentsSeen` | S14, S15, 홈 약속카드 배지 |
 | `reviews` | `getReviewTargets` `submitReview` | S17 |
 | `blocks` | `blockUser` `unblockUser` `getBlockedUsers` | S13, S17, S04 |
 | `places` | `getPlaces` | S09, S10 |
@@ -60,3 +60,11 @@ try {
 4. 다 바꾸면 `mock/` 폴더 삭제
 
 함수 모양을 바꿔야 하면 **단톡방에 먼저 알리고** `types.ts`와 이 표를 같이 고친다.
+
+## 11/3 추가 (디자인 반영과 함께 정한 기능)
+
+- **1:1 채팅방**: `RoomListItem.kind`·`RoomDetail.kind`가 `'direct'`이면 1:1 방이다. `post`·`post_id`·`category`가 `null`이고 `partner`가 상대.
+  1:1 방은 대화와 게임만 (약속 확정 버튼을 보여 주지 않는다). `getMyRooms()`를 카테고리 없이 부를 때만 나온다.
+- **활동 중**: `PostListItem.author_is_active`, `MateInfo.is_active` (최근 15분)
+- **약속카드**: `AppointmentItem.can_reschedule`(방장·시작 전 → '일정 변경'), `can_complete`(시작 이후 → '완료 및 후기')
+- **후기 문항**: `communication`·`on_time`·`kind_manner`·`ice_breaker`·`meet_again`, 3개 이상이면 하트

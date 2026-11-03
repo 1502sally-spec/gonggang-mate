@@ -1,6 +1,7 @@
 /**
  * S17 후기작성 — 담당: C
- * PRD: 체크 5문항(types/db.ts의 REVIEW_ITEMS). 4개 이상 체크하면 메이트 하트 +1 (HEART_THRESHOLD).
+ * PRD: 체크 5문항(types/db.ts의 REVIEW_ITEMS). 3개 이상 체크하면 메이트 하트 +1 (HEART_THRESHOLD, 11/3 결정).
+ * 11/3 추가: 하트가 적립되면 HeartBurst 효과. 약속 시작 이후부터 작성 가능(약속카드 '완료 및 후기').
  * 하단 '후기 남기기' → S15, 그 아래 '차단' 버튼(PRD 8.2). 신고 기능은 삭제됨(10/31 회의).
  * 메이트가 여러 명이면 저장 후 다음 메이트로 넘어가고, 모두 남기면 S15로 돌아간다.
  * 디자인은 나중에 피그마 반영 예정 (지금은 기능 위주).
@@ -13,6 +14,7 @@ import { api, ApiError, type AppointmentItem, type ReviewAnswers, type ReviewTar
 import { Avatar } from '@/components/Avatar';
 import { Button } from '@/components/Button';
 import { FormScreen } from '@/components/FormScreen';
+import { HEART_BURST_MS, HeartBurst } from '@/components/HeartBurst';
 import { HEART_THRESHOLD } from '@/constants/config';
 import { colors, fontSize, MIN_TOUCH, spacing } from '@/constants/theme';
 import { formatDateRange } from '@/lib/time';
@@ -28,6 +30,7 @@ export default function ReviewScreen() {
   const [answers, setAnswers] = useState<ReviewAnswers>(EMPTY_ANSWERS);
   const [blockedIds, setBlockedIds] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
+  const [heartFor, setHeartFor] = useState<string | null>(null); // 하트 적립 효과를 보여 줄 메이트 닉네임
 
   useEffect(() => {
     let active = true;
@@ -60,7 +63,12 @@ export default function ReviewScreen() {
     if (!target || !targets) return;
     setBusy(true);
     try {
-      await api.reviews.submitReview(appointmentId, target.id, answers);
+      const { heart_added } = await api.reviews.submitReview(appointmentId, target.id, answers);
+      if (heart_added) {
+        setHeartFor(target.nickname);
+        await new Promise((resolve) => setTimeout(resolve, HEART_BURST_MS));
+        setHeartFor(null);
+      }
       const next = targets.map((t) => (t.id === target.id ? { ...t, reviewed: true } : t));
       setTargets(next);
       const remaining = next.find((t) => !t.reviewed);
@@ -167,6 +175,7 @@ export default function ReviewScreen() {
           </Text>
         </>
       )}
+      <HeartBurst visible={heartFor !== null} nickname={heartFor ?? ''} />
     </FormScreen>
   );
 }

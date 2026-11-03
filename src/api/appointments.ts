@@ -26,6 +26,23 @@ export async function confirmAppointment(roomId: string, input: ConfirmAppointme
   return data as AppointmentItem;
 }
 
+/**
+ * S15 '일정 변경' (11/3 결정): 방장만, 시작 전. 시간·장소·활동을 바꾸고 채팅방에 "일정이 변경되었어요".
+ * 다른 참여자의 약속카드 배지가 다시 켜진다. 입력 모양은 확정과 같다
+ */
+export async function updateAppointment(appointmentId: string, input: ConfirmAppointmentInput): Promise<AppointmentItem> {
+  if (USE_MOCK_API) return mock.updateAppointment(appointmentId, input);
+  const { data, error } = await sb().rpc('update_appointment', {
+    p_appointment_id: appointmentId,
+    p_start_at: input.start_at,
+    p_end_at: input.end_at,
+    p_place: input.place,
+    p_activity: input.activity,
+  });
+  if (error) throw toApiError(error, '일정을 바꾸지 못했어요');
+  return data as AppointmentItem;
+}
+
 /** S15: 내 약속카드 (다가오는 약속 / 지난 약속). 내가 취소한 약속은 어디에도 안 남음 */
 export async function getMyAppointments(): Promise<MyAppointments> {
   if (USE_MOCK_API) return mock.getMyAppointments();

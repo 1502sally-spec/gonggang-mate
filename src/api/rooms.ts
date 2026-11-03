@@ -51,7 +51,7 @@ export async function respondJoinRequest(requestId: string, accept: boolean): Pr
   if (error) throw toApiError(error, accept ? '수락하지 못했어요' : '거절하지 못했어요');
 }
 
-/** S11: 내 채팅방 목록 (카테고리별, 최근 메시지 순) */
+/** S11: 내 채팅방 목록 (카테고리별, 최근 메시지 순). 1:1 방(kind = 'direct')은 category 없이 부를 때만 나온다 */
 export async function getMyRooms(category?: Category): Promise<RoomListItem[]> {
   if (USE_MOCK_API) return mock.getMyRooms(category);
   const { data, error } = await sb().rpc('get_my_rooms', { p_category: category ?? null });
@@ -59,7 +59,7 @@ export async function getMyRooms(category?: Category): Promise<RoomListItem[]> {
   return data as RoomListItem[];
 }
 
-/** S12: 채팅방 상단 정보 */
+/** S12: 채팅방 상단 정보. 1:1 방은 post = null, partner = 상대, is_host = false */
 export async function getRoom(roomId: string): Promise<RoomDetail> {
   if (USE_MOCK_API) return mock.getRoom(roomId);
   const { data, error } = await sb().rpc('get_room', { p_room_id: roomId });
@@ -67,7 +67,18 @@ export async function getRoom(roomId: string): Promise<RoomDetail> {
   return { ...(data as Omit<RoomDetail, 'max_members'> & { members: MiniUser[] }), max_members: MAX_ROOM_MEMBERS };
 }
 
-/** S12 메뉴 '나가기' (방장은 못 나감 → 게시물 삭제로 대신) */
+/**
+ * S13 '1:1 채팅' (11/3 결정): 같은 두 사람의 1:1 방이 있으면 그 방(나갔으면 다시 참여), 없으면 새로 만든다.
+ * 1:1 방은 대화와 게임만 (약속 확정 없음). 차단 사이에는 만들 수 없다. 방 id를 돌려준다 → /chat/[roomId]로 이동
+ */
+export async function openDirectRoom(userId: string): Promise<string> {
+  if (USE_MOCK_API) return mock.openDirectRoom(userId);
+  const { data, error } = await sb().rpc('open_direct_room', { p_user_id: userId });
+  if (error) throw toApiError(error, '1:1 채팅방을 열지 못했어요');
+  return data as string;
+}
+
+/** S12 메뉴 '나가기' (게시물 방의 방장은 못 나감 → 게시물 삭제로 대신. 1:1 방은 누구나 나갈 수 있음) */
 export async function leaveRoom(roomId: string): Promise<void> {
   if (USE_MOCK_API) return mock.leaveRoom(roomId);
   const { error } = await sb().rpc('leave_room', { p_room_id: roomId });

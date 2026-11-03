@@ -59,34 +59,40 @@ export async function respondJoinRequest(requestId: string, accept: boolean): Pr
   }
 }
 
-/** S11: 내 채팅방 목록 (카테고리별, 최근 메시지 순) */
+/** S11: 내 채팅방 목록 (카테고리별, 최근 메시지 순). 1:1 방은 카테고리가 없어 '전체'에서만 나온다 */
 export async function getMyRooms(category?: Category): Promise<RoomListItem[]> {
   await delay();
   const meId = requireMeId();
+  const blocked = blockedUserIdsOf(meId);
   const myRoomIds = db.members.filter((m) => m.user_id === meId).map((m) => m.room_id);
   const items = myRoomIds
     .map((roomId) => {
       const room = findRoom(roomId);
-      const post = db.posts.find((p) => p.id === room.post_id)!;
-      if (post.status === 'deleted' || post.status === 'closed') return null;
+      const post = room.post_id ? db.posts.find((p) => p.id === room.post_id)! : null;
+      const partnerId = room.kind === 'direct' ? (roomMemberIds(roomId).find((id) => id !== meId) ?? null) : null;
+      if (post && (post.status === 'deleted' || post.status === 'closed')) return null;
+      if (room.kind === 'direct' && (category || !partnerId || blocked.includes(partnerId))) return null;
       const messages = db.messages.filter((m) => m.room_id === roomId).sort((a, b) => a.created_at.localeCompare(b.created_at));
       const last = messages[messages.length - 1];
       const me = db.members.find((m) => m.room_id === roomId && m.user_id === meId)!;
       const lastReadIndex = me.last_read_message_id ? messages.findIndex((m) => m.id === me.last_read_message_id) : -1;
       const memberIds = roomMemberIds(roomId);
+      const isHost = room.kind === 'post' && room.host_id === meId;
       const item: RoomListItem = {
         id: roomId,
-        post_id: post.id,
-        category: post.category,
-        title: post.title,
+        kind: room.kind,
+        post_id: post?.id ?? null,
+        category: post?.category ?? null,
+        title: post ? post.title : findUser(partnerId!).nickname,
+        partner: partnerId ? toMini(partnerId) : null,
         members: memberIds.map(toMini),
         member_count: memberIds.length,
         last_message: last
           ? { sender_nickname: last.sender_id ? findUser(last.sender_id).nickname : null, body: last.type === 'game_result' ? '게임 결과를 공유했어요' : last.body, created_at: last.created_at }
           : null,
         unread_count: messages.slice(lastReadIndex + 1).filter((m) => m.sender_id !== meId).length,
-        is_host: room.host_id === meId,
-        pending_request_count: room.host_id === meId ? db.joinRequests.filter((j) => j.room_id === roomId && j.status === 'pending').length : 0,
+        is_host: isHost,
+        pending_request_count: isHost ? db.joinRequests.filter((j) => j.room_id === roomId && j.status === 'pending').length : 0,
       };
       return item;
     })
@@ -95,31 +101,55 @@ export async function getMyRooms(category?: Category): Promise<RoomListItem[]> {
   return copy(items);
 }
 
-/** S12: 채팅방 상단 정보 */
+/** S12: 채팅방 상단 정보. 1:1 방은 post = null, partner = 상대 */
 export async function getRoom(roomId: string): Promise<RoomDetail> {
   await delay(200);
   const meId = requireMeId();
   requireMember(roomId, meId);
   const room = findRoom(roomId);
-  const post = db.posts.find((p) => p.id === room.post_id)!;
+  const post = room.post_id ? db.posts.find((p) => p.id === room.post_id)! : null;
+  const partnerId = room.kind === 'direct' ? (roomMemberIds(roomId).find((id) => id !== meId) ?? null) : null;
   const appointment = db.appointments.find((a) => a.room_id === roomId && a.status !== 'canceled');
   return copy({
     id: room.id,
-    post: {
-      id: post.id,
-      title: post.title,
-      category: post.category,
-      content: post.content,
-      range: { weekday: post.weekday, start: post.start_time, end: post.end_time },
-      start_at: post.start_at,
-      end_at: post.end_at,
-    },
+    kind: room.kind,
+    post: post
+      ? {
+          id: post.id,
+          title: post.title,
+          category: post.category,
+          content: post.content,
+          range: { weekday: post.weekday, start: post.start_time, end: post.end_time },
+          start_at: post.start_at,
+          end_at: post.end_at,
+        }
+      : null,
+    partner: partnerId ? toMini(partnerId) : null,
     host: toMini(room.host_id),
     members: roomMemberIds(roomId).map(toMini),
     max_members: MAX_ROOM_MEMBERS,
-    is_host: room.host_id === meId,
+    is_host: room.kind === 'post' && room.host_id === meId,
     appointment_id: appointment?.id ?? null,
   });
+}
+
+/** S13 '1:1 채팅': 같은 두 사람의 방이 있으면 그 방(나갔으면 다시 참여), 없으면 새로 만든다. 방 id를 돌려준다 */
+export async function openDirectRoom(userId: string): Promise<string> {
+  await delay();
+  const meId = requireMeId();
+  if (userId === meId) throw new ApiError('나와는 채팅할 수 없어요', 'invalid_input');
+  findUser(userId);
+  if (blockedUserIdsOf(meId).includes(userId)) throw new ApiError('채팅할 수 없는 사용자예요', 'not_allowed');
+  const key = [meId, userId].sort().join(':');
+  let room = db.rooms.find((r) => r.direct_key === key);
+  if (!room) {
+    room = { id: newId('r'), kind: 'direct', post_id: null, host_id: meId, direct_key: key, created_at: nowIso() };
+    db.rooms.push(room);
+  }
+  for (const id of [meId, userId]) {
+    if (!roomMemberIds(room.id).includes(id)) db.members.push({ room_id: room.id, user_id: id, joined_at: nowIso(), last_read_message_id: null });
+  }
+  return room.id;
 }
 
 /** S12 메뉴 '나가기' (방장은 못 나감 → 게시물 삭제로 대신) */
@@ -127,7 +157,7 @@ export async function leaveRoom(roomId: string): Promise<void> {
   await delay();
   const meId = requireMeId();
   const room = findRoom(roomId);
-  if (room.host_id === meId) throw new ApiError('방장은 나갈 수 없어요. 게시물을 삭제해 주세요', 'not_allowed');
+  if (room.kind === 'post' && room.host_id === meId) throw new ApiError('방장은 나갈 수 없어요. 게시물을 삭제해 주세요', 'not_allowed');
   requireMember(roomId, meId);
   db.members = db.members.filter((m) => !(m.room_id === roomId && m.user_id === meId));
   addSystemMessage(roomId, `${findUser(meId).nickname}님이 나갔어요`);

@@ -2,6 +2,7 @@
  * S14 약속 확정 팝업 — 채팅방(S12)에서 방장이 '약속 확정'을 누르면 뜬다.
  * 게시물 내용으로 미리 채우고 방장이 고칠 수 있다. 장소가 비면 '확정' 비활성.
  * 시간은 격자(S08)와 같은 30분 단위로 고른다.
+ * 11/3 추가: appointment를 넘기면 '일정 변경' 모드 (S15, 방장만). 지금 약속 내용으로 채우고 '변경'을 누르면 updateAppointment
  */
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -23,11 +24,14 @@ type Props = {
   visible: boolean;
   roomId: string;
   onClose: () => void;
-  /** 확정이 끝난 뒤 불린다. 팝업을 닫고 약속카드로 이동하는 일은 채팅방에서 한다 */
+  /** 확정(또는 일정 변경)이 끝난 뒤 불린다. 팝업을 닫고 약속카드로 이동하는 일은 쓰는 쪽에서 한다 */
   onConfirmed: (appointment: AppointmentItem) => void;
+  /** 선택: 넘기면 '일정 변경' 모드 (11/3 결정, S15 방장만) */
+  appointment?: AppointmentItem | null;
 };
 
-export function ConfirmAppointmentPopup({ visible, roomId, onClose, onConfirmed }: Props) {
+export function ConfirmAppointmentPopup({ visible, roomId, onClose, onConfirmed, appointment = null }: Props) {
+  const isEdit = appointment !== null;
   const [room, setRoom] = useState<RoomDetail | null>(null);
   const [startMs, setStartMs] = useState(0);
   const [endMs, setEndMs] = useState(0);
@@ -43,12 +47,25 @@ export function ConfirmAppointmentPopup({ visible, roomId, onClose, onConfirmed 
       .getRoom(roomId)
       .then((detail) => {
         if (!active) return;
+        if (!detail.post) {
+          // 1:1 방은 약속 확정이 없다 (11/3 결정)
+          Alert.alert('1:1 채팅방에서는 약속을 확정할 수 없어요');
+          onClose();
+          return;
+        }
         setRoom(detail);
         setNow(Date.now());
-        setStartMs(new Date(detail.post.start_at).getTime());
-        setEndMs(new Date(detail.post.end_at).getTime());
-        setPlace('');
-        setActivity(`${categoryInfo[detail.post.category].label} ${detail.post.title}`.slice(0, TEXT_MAX));
+        if (appointment) {
+          setStartMs(new Date(appointment.start_at).getTime());
+          setEndMs(new Date(appointment.end_at).getTime());
+          setPlace(appointment.place);
+          setActivity(appointment.activity);
+        } else {
+          setStartMs(new Date(detail.post.start_at).getTime());
+          setEndMs(new Date(detail.post.end_at).getTime());
+          setPlace('');
+          setActivity(`${categoryInfo[detail.post.category].label} ${detail.post.title}`.slice(0, TEXT_MAX));
+        }
       })
       .catch((e) => {
         if (!active) return;
@@ -59,7 +76,7 @@ export function ConfirmAppointmentPopup({ visible, roomId, onClose, onConfirmed 
       active = false;
       setRoom(null); // 다시 열 때 지난 내용이 보이지 않게
     };
-  }, [visible, roomId, onClose]);
+  }, [visible, roomId, onClose, appointment]);
 
   const startMinutes = kstMinutesOfDay(new Date(startMs).toISOString());
   const endMinutes = kstMinutesOfDay(new Date(endMs).toISOString());
@@ -79,22 +96,20 @@ export function ConfirmAppointmentPopup({ visible, roomId, onClose, onConfirmed 
   const onSubmit = async () => {
     setBusy(true);
     try {
-      const appointment = await api.appointments.confirmAppointment(roomId, {
-        start_at: new Date(startMs).toISOString(),
-        end_at: new Date(endMs).toISOString(),
-        place,
-        activity,
-      });
-      onConfirmed(appointment);
+      const input = { start_at: new Date(startMs).toISOString(), end_at: new Date(endMs).toISOString(), place, activity };
+      const result = appointment
+        ? await api.appointments.updateAppointment(appointment.id, input)
+        : await api.appointments.confirmAppointment(roomId, input);
+      onConfirmed(result);
     } catch (e) {
-      Alert.alert(e instanceof ApiError ? e.message : '약속을 확정하지 못했어요');
+      Alert.alert(e instanceof ApiError ? e.message : isEdit ? '일정을 바꾸지 못했어요' : '약속을 확정하지 못했어요');
     } finally {
       setBusy(false);
     }
   };
 
   return (
-    <BottomSheet visible={visible} onClose={onClose} title="약속 확정">
+    <BottomSheet visible={visible} onClose={onClose} title={isEdit ? '일정 변경' : '약속 확정'}>
       {!room ? (
         <ActivityIndicator color={colors.primary} style={styles.loading} />
       ) : (
@@ -144,15 +159,23 @@ export function ConfirmAppointmentPopup({ visible, roomId, onClose, onConfirmed 
               </View>
             </View>
 
-            <Text style={styles.guide}>확정하면 채팅방의 모든 메이트에게 약속카드가 전송되고, 게시물은 매칭 목록에서 내려가요.</Text>
+            <Text style={styles.guide}>
+              {isEdit
+                ? '바꾸면 채팅방에 "일정이 변경되었어요"가 남고, 메이트의 약속카드에 바로 반영돼요.'
+                : '확정하면 채팅방의 모든 메이트에게 약속카드가 전송되고, 게시물은 매칭 목록에서 내려가요.'}
+            </Text>
           </ScrollView>
 
           <View style={styles.buttons}>
             <View style={styles.button}>
-              <Button label="수정" variant="secondary" onPress={onClose} disabled={busy} />
+              <Button label={isEdit ? '취소' : '수정'} variant="secondary" onPress={onClose} disabled={busy} />
             </View>
             <View style={styles.button}>
-              <Button label={busy ? '확정 중...' : '확정'} onPress={onSubmit} disabled={!place.trim() || isPast || busy} />
+              <Button
+                label={busy ? (isEdit ? '변경 중...' : '확정 중...') : isEdit ? '변경' : '확정'}
+                onPress={onSubmit}
+                disabled={!place.trim() || isPast || busy}
+              />
             </View>
           </View>
         </>

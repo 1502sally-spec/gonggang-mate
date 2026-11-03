@@ -1,7 +1,9 @@
 /**
  * S13 메이트 정보 팝업 — 채팅방(S12)에서 프로필 사진을 누르면 뜬다.
  * 후기는 누가 남겼는지 숨기고 항목별 합계만 보여 준다. 내 정보에는 '차단' 버튼이 없다.
+ * 11/3 추가: 현재 활동 중 표시(최근 15분), '1:1 채팅' 버튼(같은 두 사람의 방은 하나, 차단 사이엔 정보 자체가 안 보임)
  */
+import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 
@@ -46,6 +48,20 @@ export function MateInfoPopup({ userId, onClose, onBlocked }: Props) {
     };
   }, [userId]);
 
+  const onDirectChat = async () => {
+    if (!info) return;
+    setBusy(true);
+    try {
+      const roomId = await api.rooms.openDirectRoom(info.id);
+      onClose();
+      router.push({ pathname: '/chat/[roomId]', params: { roomId } });
+    } catch (e) {
+      Alert.alert(e instanceof ApiError ? e.message : '1:1 채팅방을 열지 못했어요');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const onBlock = () => {
     if (!info) return;
     Alert.alert(`${info.nickname}님을 차단할까요?`, '서로의 글과 메시지가 보이지 않게 돼요.', [
@@ -80,7 +96,15 @@ export function MateInfoPopup({ userId, onClose, onBlocked }: Props) {
           <View style={styles.profile}>
             <Avatar nickname={info.nickname} photoUrl={info.photo_url} size={64} />
             <View style={styles.profileText}>
-              <Text style={styles.nickname}>{info.nickname}</Text>
+              <View style={styles.nameRow}>
+                <Text style={styles.nickname}>{info.nickname}</Text>
+                {info.is_active ? (
+                  <View style={styles.active} accessibilityLabel="현재 활동 중">
+                    <View style={styles.activeDot} />
+                    <Text style={styles.activeText}>활동 중</Text>
+                  </View>
+                ) : null}
+              </View>
               <Text style={styles.sub}>{GENDER_LABELS[info.gender]}</Text>
               {info.bio ? <Text style={styles.bio}>{info.bio}</Text> : null}
             </View>
@@ -103,7 +127,8 @@ export function MateInfoPopup({ userId, onClose, onBlocked }: Props) {
         </ScrollView>
       )}
 
-      {info && !isMe ? <Button label={busy ? '차단 중...' : '차단'} variant="danger" onPress={onBlock} disabled={busy} /> : null}
+      {info && !isMe ? <Button label="1:1 채팅" onPress={onDirectChat} disabled={busy} /> : null}
+      {info && !isMe ? <Button label={busy ? '처리 중...' : '차단'} variant="danger" onPress={onBlock} disabled={busy} /> : null}
       <Button label="닫기" variant="secondary" onPress={onClose} />
     </BottomSheet>
   );
@@ -115,7 +140,11 @@ const styles = StyleSheet.create({
   body: { gap: spacing.md, paddingBottom: spacing.sm },
   profile: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   profileText: { flex: 1, gap: 2 },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   nickname: { color: colors.ink, fontSize: fontSize.body, fontWeight: '900' },
+  active: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999, backgroundColor: colors.primaryTint },
+  activeDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.success },
+  activeText: { color: colors.primary, fontSize: fontSize.caption, fontWeight: '700' },
   sub: { color: colors.sub, fontSize: fontSize.caption + 1 },
   bio: { color: colors.ink, fontSize: fontSize.caption + 1 },
   stats: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },

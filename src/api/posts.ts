@@ -29,6 +29,7 @@ type MatchingRow = {
   author_id: string;
   author_nickname: string;
   author_photo_url: string | null;
+  author_is_active: boolean;
   member_count: number;
   is_mine: boolean;
   my_request: MyRequestStatus;
@@ -98,6 +99,7 @@ function toListItem(r: MatchingRow): PostListItem {
     end_at: r.end_at,
     thumbnail_url: r.thumbnail_url,
     author: { id: r.author_id, nickname: r.author_nickname, photo_url: r.author_photo_url },
+    author_is_active: r.author_is_active,
     member_count: r.member_count,
     max_members: MAX_ROOM_MEMBERS,
     is_mine: r.is_mine,

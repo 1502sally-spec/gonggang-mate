@@ -174,6 +174,12 @@ function PostBar({ post, accent, busy, onRequest, onCancelRequest, onOpenRoom }:
           <Text style={styles.metaText}>
             {post.is_mine ? '내 글' : post.author.nickname} · {post.member_count}/{post.max_members}명
           </Text>
+          {!post.is_mine && post.author_is_active ? (
+            <View style={styles.active} accessibilityLabel="작성자 현재 활동 중">
+              <View style={styles.activeDot} />
+              <Text style={styles.activeText}>활동 중</Text>
+            </View>
+          ) : null}
         </View>
       </View>
       <View style={styles.action}>
@@ -206,6 +212,10 @@ function ActionButton({ post, full, busy, onRequest, onCancelRequest, onOpenRoom
 }
 
 const styles = StyleSheet.create({
+  // 11/3 추가: 작성자 현재 활동 중 표시 (최근 15분)
+  active: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999, backgroundColor: colors.primaryTint },
+  activeDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.success },
+  activeText: { color: colors.primary, fontSize: fontSize.caption, fontWeight: '700' },
   safe: { flex: 1, backgroundColor: colors.bg },
   topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.sm },
   back: { width: MIN_TOUCH, height: MIN_TOUCH, alignItems: 'center', justifyContent: 'center' },

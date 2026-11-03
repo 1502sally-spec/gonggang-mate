@@ -23,7 +23,7 @@ export async function submitReview(appointmentId: string, targetId: string, answ
   if (targetId === meId) throw new ApiError('자기 자신에게는 후기를 남길 수 없어요', 'invalid_input');
   const a = db.appointments.find((x) => x.id === appointmentId);
   if (!a || a.status === 'canceled') throw new ApiError('약속을 찾을 수 없어요', 'not_found');
-  if (new Date(a.end_at).getTime() > Date.now()) throw new ApiError('약속이 끝난 뒤에 후기를 남길 수 있어요', 'not_allowed');
+  if (new Date(a.start_at).getTime() > Date.now()) throw new ApiError('약속이 시작된 뒤에 후기를 남길 수 있어요', 'not_allowed');
   const active = (id: string) => db.appointmentMembers.some((m) => m.appointment_id === appointmentId && m.user_id === id && !m.canceled_at);
   if (!active(meId) || !active(targetId)) throw new ApiError('함께한 메이트에게만 후기를 남길 수 있어요', 'not_allowed');
   if (db.reviews.some((r) => r.appointment_id === appointmentId && r.reviewer_id === meId && r.target_id === targetId)) {

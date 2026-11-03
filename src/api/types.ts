@@ -9,6 +9,7 @@ import type {
   GameType,
   Message,
   ReviewItemKey,
+  RoomKind,
   TimeRange,
   Timestamp,
   User,
@@ -48,6 +49,7 @@ export type ProfileInput = {
 
 /** S13 메이트 정보 */
 export type MateInfo = Pick<User, 'id' | 'nickname' | 'gender' | 'bio' | 'photo_url' | 'heart_count'> & {
+  is_active: boolean; // 최근 15분 안에 앱을 썼는지 (마지막 접속 시각은 공개하지 않음)
   meet_count: number; // 만남 횟수 (완료된 약속 수)
   review_counts: Record<ReviewItemKey, number>; // 항목별 받은 횟수. 누가 남겼는지는 공개하지 않음
 };
@@ -67,6 +69,7 @@ export type PostListItem = {
   end_at: Timestamp;
   thumbnail_url: string | null;
   author: MiniUser;
+  author_is_active: boolean; // 작성자가 지금 활동 중인지 (최근 15분)
   member_count: number; // 현재 채팅방 인원 (방장 포함)
   max_members: number;
   is_mine: boolean; // 내 글이면 말풍선 대신 '내 채팅방' 버튼
@@ -83,12 +86,14 @@ export type CreatePostInput = {
   photo_uris?: string[]; // P2: 사진 첨부
 };
 
-/** S11 채팅 목록의 칸 하나 */
+/** S11 채팅 목록의 칸 하나. kind = 'direct'(1:1 방)이면 post_id·category가 null이고 partner가 상대 */
 export type RoomListItem = {
   id: string;
-  post_id: string;
-  category: Category;
-  title: string; // = 게시물 제목
+  kind: RoomKind;
+  post_id: string | null;
+  category: Category | null; // 1:1 방은 카테고리가 없어 '전체'에서만 나온다
+  title: string; // 게시물 제목 (1:1 방은 상대 닉네임)
+  partner: MiniUser | null; // 1:1 방의 상대
   members: MiniUser[]; // 겹친 아바타용
   member_count: number;
   last_message: { sender_nickname: string | null; body: string; created_at: Timestamp } | null;
@@ -97,10 +102,12 @@ export type RoomListItem = {
   pending_request_count: number; // 방장에게만 의미 있음
 };
 
-/** S12 채팅방 상단 정보 */
+/** S12 채팅방 상단 정보. 1:1 방(kind = 'direct')은 post = null, partner = 상대, is_host = false, 약속 확정 없음 */
 export type RoomDetail = {
   id: string;
-  post: { id: string; title: string; category: Category; content: string; range: TimeRange; start_at: Timestamp; end_at: Timestamp };
+  kind: RoomKind;
+  post: { id: string; title: string; category: Category; content: string; range: TimeRange; start_at: Timestamp; end_at: Timestamp } | null;
+  partner: MiniUser | null;
   host: MiniUser;
   members: MiniUser[];
   max_members: number;
@@ -143,6 +150,8 @@ export type AppointmentItem = {
   members: MiniUser[]; // 취소한 사람은 빠짐
   is_host: boolean;
   can_cancel: boolean; // 시작 전에만 true
+  can_reschedule: boolean; // '일정 변경': 방장이고 시작 전 (11/3 결정)
+  can_complete: boolean; // '완료 및 후기': 약속 시작 이후 (11/3 결정)
   review_done: boolean; // 모든 메이트에게 후기를 남겼는지
 };
 
