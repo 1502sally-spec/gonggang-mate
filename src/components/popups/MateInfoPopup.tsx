@@ -14,8 +14,8 @@ import { api, ApiError, type MateInfo } from '@/api';
 import { Avatar } from '@/components/Avatar';
 import { Button } from '@/components/Button';
 import { Icon } from '@/components/Icon';
+import { TopReviews } from '@/components/TopReviews';
 import { colors, fontSize, radius, spacing } from '@/constants/theme';
-import { REVIEW_ITEMS } from '@/types/db';
 
 const GENDER_LABELS: Record<MateInfo['gender'], string> = { male: '남성', female: '여성' };
 
@@ -88,11 +88,6 @@ export function MateInfoPopup({ userId, onClose, onBlocked }: Props) {
     ]);
   };
 
-  // 가장 많이 받은 후기 (대표 후기)
-  const top = info
-    ? REVIEW_ITEMS.map((item) => ({ ...item, count: info.review_counts[item.key] ?? 0 })).sort((a, b) => b.count - a.count)[0]
-    : null;
-
   return (
     <Modal visible={userId !== null} animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>
       <SafeAreaProvider>
@@ -155,30 +150,10 @@ export function MateInfoPopup({ userId, onClose, onBlocked }: Props) {
                   </Text>
                 </View>
 
-                {/* 대표 후기 + 항목별 받은 횟수 (누가 남겼는지는 숨김) */}
+                {/* 대표 후기: 많이 받은 항목 상위 3개 (11/6 결정 6번). 누가 남겼는지는 숨김 */}
                 <Text style={styles.sectionTitle}>대표 후기</Text>
                 <View style={styles.card}>
-                  <View style={styles.topReview}>
-                    <View style={styles.iconCircle}>
-                      <Icon name="star" size={16} color={colors.primary} />
-                    </View>
-                    <View style={styles.flex}>
-                      <Text style={top && top.count > 0 ? styles.topReviewText : styles.muted}>
-                        {top && top.count > 0 ? top.label : '아직 받은 후기가 없어요'}
-                      </Text>
-                      {top && top.count > 0 ? <Text style={styles.topReviewSub}>가장 많이 받은 후기</Text> : null}
-                    </View>
-                  </View>
-                  {REVIEW_ITEMS.some(({ key }) => info.review_counts[key] > 0) ? (
-                    <View style={styles.reviews}>
-                      {REVIEW_ITEMS.map(({ key, label }) => (
-                        <View key={key} style={styles.reviewRow}>
-                          <Text style={styles.reviewLabel}>{label}</Text>
-                          <Text style={styles.reviewCount}>{info.review_counts[key]}</Text>
-                        </View>
-                      ))}
-                    </View>
-                  ) : null}
+                  <TopReviews counts={info.review_counts} emptyText="아직 받은 후기가 없어요" />
                 </View>
               </ScrollView>
 
@@ -200,7 +175,6 @@ export function MateInfoPopup({ userId, onClose, onBlocked }: Props) {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
-  flex: { flex: 1 },
   topBar: { minHeight: 48, paddingHorizontal: spacing.sm, justifyContent: 'center' },
   back: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   loading: { marginTop: spacing.lg * 2 },
@@ -227,14 +201,6 @@ const styles = StyleSheet.create({
   heartCount: { color: colors.primary, fontSize: 22, fontWeight: '900' },
   heartUnit: { color: colors.ink, fontSize: fontSize.body - 1, fontWeight: '600' },
   sectionTitle: { color: colors.ink, fontSize: fontSize.body + 1, fontWeight: '800', marginBottom: -spacing.xs },
-  topReview: { flexDirection: 'row', alignItems: 'center', gap: spacing.md - 4 },
-  topReviewText: { color: colors.primary, fontSize: fontSize.body, fontWeight: '800' },
-  topReviewSub: { color: colors.sub, fontSize: fontSize.caption },
-  muted: { color: colors.sub, fontSize: fontSize.body - 1 },
-  reviews: { gap: 6, paddingTop: spacing.sm, borderTopWidth: 1, borderTopColor: colors.line },
-  reviewRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
-  reviewLabel: { flex: 1, color: colors.sub, fontSize: fontSize.caption + 1 },
-  reviewCount: { color: colors.primary, fontSize: fontSize.caption + 1, fontWeight: '800' },
   footer: { paddingHorizontal: spacing.lg - 4, paddingTop: spacing.sm, paddingBottom: spacing.sm, gap: spacing.xs, alignItems: 'stretch' },
   blockLink: { alignSelf: 'center', paddingVertical: spacing.sm },
   blockText: { color: colors.sub, fontSize: fontSize.body - 1, textDecorationLine: 'underline' },

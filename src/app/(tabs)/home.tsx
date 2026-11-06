@@ -19,12 +19,12 @@ import { CATEGORIES, categoryInfo, colors, fontSize, radius, spacing, type Categ
 import { formatDateRange, formatTimeLeft, kstWeekday, WEEKDAY_LABELS } from '@/lib/time';
 import type { TimeRange } from '@/types/db';
 
-/** 카테고리 박스 아이콘과 부제 (디자인팀 UI) */
-const CATEGORY_UI: Record<Category, { icon: IconName; caption: string }> = {
-  meal: { icon: 'utensils', caption: '함께 먹기' },
-  cafe: { icon: 'coffee', caption: '수다 한 잔' },
-  study: { icon: 'book-open', caption: '같이 집중' },
-  walk: { icon: 'map', caption: '캠퍼스 한 바퀴' },
+/** 카테고리 박스 아이콘 (디자인팀 UI). 부제(함께 먹기 등)는 11/6 결정 4번으로 뺐다 */
+const CATEGORY_ICON: Record<Category, IconName> = {
+  meal: 'utensils',
+  cafe: 'coffee',
+  study: 'book-open',
+  walk: 'map',
 };
 
 type HomeData = {
@@ -118,20 +118,19 @@ export default function HomeScreen() {
             <Text style={styles.sectionTitle}>무엇을 함께할까요?</Text>
             <View style={styles.grid}>
               {CATEGORIES.map((category) => {
-                const ui = CATEGORY_UI[category];
                 const label = categoryInfo[category].label;
                 const count = data.counts?.[category] ?? 0;
                 return (
                   <Pressable
                     key={category}
                     accessibilityRole="button"
-                    accessibilityLabel={`${label}, ${ui.caption}${count > 0 ? `, 내게 보이는 글 ${count}개` : ''}`}
+                    accessibilityLabel={`${label}${count > 0 ? `, 내게 보이는 글 ${count}개` : ''}`}
                     onPress={() => router.push({ pathname: '/board/[category]', params: { category } })}
                     style={({ pressed }) => [styles.categoryBox, pressed && styles.pressed]}
                   >
                     <View style={styles.categoryTop}>
                       <View style={styles.iconCircle}>
-                        <Icon name={ui.icon} size={20} color={colors.primary} />
+                        <Icon name={CATEGORY_ICON[category]} size={20} color={colors.primary} />
                       </View>
                       {count > 0 ? (
                         <View style={styles.countPill}>
@@ -139,9 +138,7 @@ export default function HomeScreen() {
                         </View>
                       ) : null}
                     </View>
-                    <Text style={styles.categoryLabel}>
-                      {label} / {ui.caption}
-                    </Text>
+                    <Text style={styles.categoryLabel}>{label}</Text>
                   </Pressable>
                 );
               })}

@@ -35,7 +35,7 @@ export const categoryInfo: Record<Category, { label: string; accent: string; bac
   meal: { label: '식사', accent: '#D9480F', background: '#FFF0E6' },
   cafe: { label: '카페', accent: '#8B5E3C', background: '#F5EDE6' },
   study: { label: '공부', accent: '#2B4ACB', background: '#E9EEFF' },
-  walk: { label: '산책', accent: '#2F7A3E', background: '#E6F5EA' },
+  walk: { label: '산책/운동', accent: '#2F7A3E', background: '#E6F5EA' },
 };
 
 /** 혼자 지도 장소 분류 (11/2 결정). 핀·칩 색 */

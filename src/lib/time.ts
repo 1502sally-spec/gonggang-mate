@@ -76,6 +76,11 @@ export function kstMinutesOfDay(at: Timestamp): number {
   return toKstParts(new Date(at)).minutes;
 }
 
+/** 한국 시간 기준 그날 0시의 UTC 밀리초 */
+export function kstDayStartMs(ms: number): number {
+  return toKstParts(new Date(ms)).dayStartUtcMs;
+}
+
 /** '11월 2일 (월)' */
 export function formatDate(at: Timestamp): string {
   const kst = new Date(new Date(at).getTime() + KST_OFFSET_MS);

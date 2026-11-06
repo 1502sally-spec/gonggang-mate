@@ -35,6 +35,11 @@ export const POST_PHOTO_MAX = 5;
 // 20명이 차면 말풍선 버튼 비활성. 방장이 약속 확정하면 매칭 목록에서 내려간다.
 export const MAX_ROOM_MEMBERS = 20;
 
+// ── 약속 확정·일정 변경 (S14, 11/6 결정 2번) ──
+// 날짜는 달력, 시간은 다이얼로 고른다. 날짜는 오늘부터 14일 후까지, 시간은 5분 단위로 맞춘다
+export const APPOINTMENT_MAX_DAYS = 14;
+export const APPOINTMENT_MINUTE_STEP = 5;
+
 // ── 약속 알림 (PRD 7.3) ──
 export const REMIND_BEFORE_MINUTES = 30;
 

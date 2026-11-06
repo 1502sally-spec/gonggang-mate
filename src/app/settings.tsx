@@ -1,7 +1,7 @@
 /**
  * S04 설정(프로필) — 담당: A (디자인팀 UI 반영)
  * - 프로필 카드: 사진(없으면 사람 아이콘), 닉네임(필수, 2~10자, 중복 불가), 한줄소개(최대 40자), 성별(필수, 디자인에 없어 카드 안에 추가)
- * - 내 메이트하트(개수 + 막대), 대표 후기(가장 많이 받은 후기 항목) — 기존 사용자만
+ * - 내 메이트하트(개수 + 막대), 대표 후기(많이 받은 후기 항목 상위 3개, 11/6 결정 6번) — 기존 사용자만
  * - 차단 목록 보기·해제(PRD 8.2, 디자인에 없어 카드로 추가), 로그아웃, 저장 버튼(디자인에 없어 하단에 추가)
  * - 관심활동은 넣지 않는다 (11/3 결정 6번)
  * - 신규 가입자(mode=new): 회원가입 중 프로필 저장이 끊긴 경우의 예비 화면. 뒤로가기 없음, 버튼 "저장하고 시작하기"
@@ -15,22 +15,16 @@ import { Avatar } from '@/components/Avatar';
 import { Button } from '@/components/Button';
 import { FormScreen } from '@/components/FormScreen';
 import { type Gender, GenderPicker } from '@/components/GenderPicker';
-import { Icon } from '@/components/Icon';
+import { Icon, type IconName } from '@/components/Icon';
+import { TopReviews } from '@/components/TopReviews';
 import { TextField } from '@/components/TextField';
 import { BIO_MAX_LENGTH, NICKNAME_MAX_LENGTH, NICKNAME_MIN_LENGTH } from '@/constants/config';
 import { colors, fontSize, radius, spacing } from '@/constants/theme';
-import { REVIEW_ITEMS } from '@/types/db';
 
 /** 메이트하트 막대가 가득 차는 개수 (보기용) */
 const HEART_BAR_MAX = 20;
 
 /** 가장 많이 받은 후기 항목. 받은 후기가 없으면 null */
-function topReview(info: MateInfo | null): string | null {
-  if (!info) return null;
-  const best = REVIEW_ITEMS.map((item) => ({ label: item.label, count: info.review_counts[item.key] ?? 0 })).sort((a, b) => b.count - a.count)[0];
-  return best && best.count > 0 ? best.label : null;
-}
-
 export default function SettingsScreen() {
   const { mode } = useLocalSearchParams<{ mode?: string }>();
   const isNew = mode === 'new';
@@ -133,7 +127,6 @@ export default function SettingsScreen() {
   }
 
   const hearts = mate?.heart_count ?? 0;
-  const review = topReview(mate);
 
   return (
     <FormScreen
@@ -190,9 +183,8 @@ export default function SettingsScreen() {
 
           {/* 대표 후기 */}
           <Text style={styles.sectionTitle}>대표 후기</Text>
-          <View style={[styles.card, styles.reviewCard]}>
-            <Icon name="message-circle" size={18} color={review ? colors.primary : colors.primarySoft} />
-            <Text style={review ? styles.reviewText : styles.muted}>{review ?? '아직 등록된 대표 후기가 없어요'}</Text>
+          <View style={styles.card}>
+            <TopReviews counts={mate?.review_counts} emptyText="아직 등록된 대표 후기가 없어요" />
           </View>
 
           {/* 차단 목록 (디자인에 없어 같은 카드 형식으로 추가) */}
@@ -211,12 +203,29 @@ export default function SettingsScreen() {
             )}
           </View>
 
+          {/* 앱 정보 (11/6 결정 10번: 가이드 다시 보기) */}
+          <Text style={styles.sectionTitle}>앱 정보</Text>
+          <View style={[styles.card, styles.menuCard]}>
+            <MenuRow icon="book-open" label="앱 사용 가이드 다시 보기" onPress={() => router.push({ pathname: '/guide', params: { replay: '1' } })} />
+          </View>
+
           <Pressable accessibilityRole="button" onPress={onLogout} style={styles.logout} hitSlop={8}>
             <Text style={styles.logoutText}>로그아웃</Text>
           </Pressable>
         </>
       ) : null}
     </FormScreen>
+  );
+}
+
+/** 앱 정보 카드의 한 줄 (아이콘 + 글자 + 오른쪽 화살표) */
+function MenuRow({ icon, label, onPress }: { icon: IconName; label: string; onPress: () => void }) {
+  return (
+    <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.menuRow, pressed && styles.pressed]}>
+      <Icon name={icon} size={18} color={colors.primary} />
+      <Text style={styles.menuLabel}>{label}</Text>
+      <Icon name="chevron-right" size={18} color={colors.sub} />
+    </Pressable>
   );
 }
 
@@ -238,11 +247,13 @@ const styles = StyleSheet.create({
   heartText: { color: colors.alert, fontSize: fontSize.body + 1, fontWeight: '800', fontVariant: ['tabular-nums'] },
   bar: { height: 8, borderRadius: radius.pill, backgroundColor: colors.primaryTint, overflow: 'hidden' },
   barFill: { height: '100%', borderRadius: radius.pill, backgroundColor: colors.primary },
-  reviewCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.md - 2 },
-  reviewText: { flex: 1, color: colors.primary, fontSize: fontSize.body, fontWeight: '700' },
   muted: { flex: 1, color: colors.sub, fontSize: fontSize.body - 1 },
   blockRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   blockName: { flex: 1, color: colors.ink, fontSize: fontSize.body },
+  menuCard: { gap: 0, paddingVertical: spacing.xs },
+  menuRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm + 2, minHeight: 48 },
+  menuLabel: { flex: 1, color: colors.ink, fontSize: fontSize.body, fontWeight: '600' },
+  pressed: { opacity: 0.6 },
   logout: { alignSelf: 'flex-start', paddingVertical: spacing.sm },
   logoutText: { color: colors.sub, fontSize: fontSize.body - 1, textDecorationLine: 'underline' },
   error: { color: colors.danger, fontSize: fontSize.caption + 1, textAlign: 'center' },

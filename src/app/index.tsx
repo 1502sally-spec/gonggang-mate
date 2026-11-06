@@ -2,6 +2,7 @@
  * S01 타이틀 — 담당: A (디자인팀 UI 반영: 보라 배경, 겹친 두 원 로고, 새 슬로건, 하단 저작권)
  * PRD: 로고, 슬로건, 로딩 표시.
  * - 저장된 로그인 세션이 있으면 S05, 없으면 S02. 프로필(닉네임)이 없으면 S04 신규 설정.
+ * - 이 기기에서 처음 켜면 첫 사용 가이드(guide.tsx)를 먼저 보여 준다 (11/6 결정 10번). 가이드가 끝나면 이 화면으로 돌아와 위 흐름을 탄다.
  * - 로딩은 최소 1초, 최대 3초. 3초 안에 확인 못 하면(네트워크 실패) 재시도 안내.
  */
 import { router } from 'expo-router';
@@ -13,6 +14,7 @@ import { Button } from '@/components/Button';
 import { Logo } from '@/components/Logo';
 import { colors, fontSize, spacing } from '@/constants/theme';
 import { goAfterAuth } from '@/lib/authRoute';
+import { hasSeenGuide } from '@/lib/guide';
 
 const MIN_MS = 1000;
 const MAX_MS = 3000;
@@ -33,7 +35,8 @@ export default function TitleScreen() {
         }),
       ]);
       await wait(Math.max(0, MIN_MS - (Date.now() - startedAt)));
-      if (me) goAfterAuth(me);
+      if (!hasSeenGuide()) router.replace('/guide');
+      else if (me) goAfterAuth(me);
       else router.replace('/login');
       return true;
     } catch {
