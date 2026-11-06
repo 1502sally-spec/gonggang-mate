@@ -39,7 +39,8 @@
         {
           "locationWhenInUsePermission": "혼자 지도에서 내 위치를 보여 주기 위해 위치 정보를 사용해요."
         }
-      ]
+      ],
+      "@react-native-community/datetimepicker"
     ],
     "experiments": {
       "typedRoutes": true,

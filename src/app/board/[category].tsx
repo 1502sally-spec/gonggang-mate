@@ -194,7 +194,7 @@ const LOOKING_FOR: Record<Category, string> = {
   meal: '함께 식사할',
   cafe: '함께 카페 갈',
   study: '함께 공부할',
-  walk: '함께 산책할',
+  walk: '함께 산책·운동할',
 };
 
 type PostCardProps = {

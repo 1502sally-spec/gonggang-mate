@@ -3,7 +3,7 @@
  * 디자인팀 UI 반영(11/4, A): 아래 팝업 대신 전체 화면 카드 (시간·장소·활동, 아이콘 원, 위쪽 보라 띠), 오른쪽 아래 '확정'.
  * 디자인에 없는 참여 메이트, 종료 시각, 취소 버튼은 같은 카드 형식으로 넣었다. 쓰는 쪽 입력값은 그대로다.
  * 게시물 내용으로 미리 채우고 방장이 고칠 수 있다. 장소가 비면 '확정' 비활성.
- * 시간은 격자(S08)와 같은 30분 단위로 고른다.
+ * 11/6 결정 2번: 날짜는 달력, 시작·종료 시간은 다이얼(DateTimeField). 날짜는 오늘~14일 후, 시간은 5분 단위로 맞춘다.
  * 11/3 추가: appointment를 넘기면 '일정 변경' 모드 (S15, 방장만). 지금 약속 내용으로 채우고 '변경'을 누르면 updateAppointment
  */
 import { useEffect, useState } from 'react';
@@ -13,13 +13,18 @@ import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { api, ApiError, type AppointmentItem, type RoomDetail } from '@/api';
 import { Avatar } from '@/components/Avatar';
 import { Button } from '@/components/Button';
+import { DateTimeField } from '@/components/DateTimeField';
 import { Icon, type IconName } from '@/components/Icon';
-import { DAY_END, DAY_START, SLOT_MINUTES } from '@/constants/config';
+import { APPOINTMENT_MAX_DAYS, APPOINTMENT_MINUTE_STEP } from '@/constants/config';
 import { categoryInfo, colors, fontSize, radius, spacing } from '@/constants/theme';
-import { formatDate, kstMinutesOfDay, minutesToTime, timeToMinutes } from '@/lib/time';
+import { formatDate, kstDayStartMs, kstMinutesOfDay, minutesToTime } from '@/lib/time';
 
-const SLOT_MS = SLOT_MINUTES * 60_000;
-const DAY_MS = 24 * 60 * 60_000;
+const MINUTE_MS = 60_000;
+const DAY_MS = 24 * 60 * MINUTE_MS;
+const LAST_MINUTE = 24 * 60 - APPOINTMENT_MINUTE_STEP; // 23:55
+
+/** 고른 시각을 5분 단위로 맞춘다 (11/6 결정 2번) */
+const roundMinutes = (minutes: number) => Math.min(Math.round(minutes / APPOINTMENT_MINUTE_STEP) * APPOINTMENT_MINUTE_STEP, LAST_MINUTE);
 const TEXT_MAX = 50;
 
 type Props = {
@@ -82,17 +87,37 @@ export function ConfirmAppointmentPopup({ visible, roomId, onClose, onConfirmed,
 
   const startMinutes = kstMinutesOfDay(new Date(startMs).toISOString());
   const endMinutes = kstMinutesOfDay(new Date(endMs).toISOString());
+  const dayStart = kstDayStartMs(startMs);
+  const todayStart = kstDayStartMs(now);
+  const lastDayStart = todayStart + APPOINTMENT_MAX_DAYS * DAY_MS;
   const isPast = startMs <= now;
+  const isTooFar = dayStart > lastDayStart;
+  const isEndBeforeStart = endMs <= startMs;
+  const timeError = isPast
+    ? '이미 지난 시간이에요. 날짜나 시간을 바꿔 주세요.'
+    : isTooFar
+      ? `약속은 오늘부터 ${APPOINTMENT_MAX_DAYS}일 안으로 잡을 수 있어요.`
+      : isEndBeforeStart
+        ? '종료 시간은 시작 시간보다 늦어야 해요.'
+        : null;
 
-  const moveStart = (direction: 1 | -1) => {
-    const next = startMs + direction * SLOT_MS;
-    setStartMs(next);
-    if (next >= endMs) setEndMs(next + SLOT_MS);
+  // 날짜를 바꾸면 시작·종료 시각은 그대로 두고 날짜만 옮긴다
+  const onPickDate = (pickedMs: number) => {
+    const day = kstDayStartMs(pickedMs);
+    setStartMs(day + startMinutes * MINUTE_MS);
+    setEndMs(day + endMinutes * MINUTE_MS);
   };
 
-  const moveDate = (direction: 1 | -1) => {
-    setStartMs(startMs + direction * DAY_MS);
-    setEndMs(endMs + direction * DAY_MS);
+  // 시작을 바꾸면 약속 길이는 그대로 두고 종료도 같이 옮긴다 (그날 23:55를 넘지 않게)
+  const onPickStart = (pickedMs: number) => {
+    const nextStart = dayStart + roundMinutes(kstMinutesOfDay(new Date(pickedMs).toISOString())) * MINUTE_MS;
+    const duration = Math.max(endMs - startMs, APPOINTMENT_MINUTE_STEP * MINUTE_MS);
+    setStartMs(nextStart);
+    setEndMs(Math.min(nextStart + duration, dayStart + LAST_MINUTE * MINUTE_MS));
+  };
+
+  const onPickEnd = (pickedMs: number) => {
+    setEndMs(dayStart + roundMinutes(kstMinutesOfDay(new Date(pickedMs).toISOString())) * MINUTE_MS);
   };
 
   const onSubmit = async () => {
@@ -134,38 +159,20 @@ export function ConfirmAppointmentPopup({ visible, roomId, onClose, onConfirmed,
                     <View style={styles.cardBar} />
 
                     <Section icon="clock" label="시간">
-                      <View style={styles.valueBox}>
-                        <Text style={styles.valueDate}>{formatDate(new Date(startMs).toISOString())}</Text>
-                        <Text style={styles.valueTime}>
-                          {minutesToTime(startMinutes)} ~ {minutesToTime(endMinutes)}
-                        </Text>
-                      </View>
-                      <View style={styles.steppers}>
-                        <Stepper
+                      <View style={styles.fields}>
+                        <DateTimeField
                           label="날짜"
-                          value={formatDate(new Date(startMs).toISOString())}
-                          onPrev={() => moveDate(-1)}
-                          onNext={() => moveDate(1)}
-                          prevDisabled={startMs - DAY_MS <= now}
+                          mode="date"
+                          value={startMs}
+                          display={formatDate(new Date(startMs).toISOString())}
+                          onChange={onPickDate}
+                          minimumDate={todayStart}
+                          maximumDate={lastDayStart}
                         />
-                        <Stepper
-                          label="시작"
-                          value={minutesToTime(startMinutes)}
-                          onPrev={() => moveStart(-1)}
-                          onNext={() => moveStart(1)}
-                          prevDisabled={startMinutes - SLOT_MINUTES < timeToMinutes(DAY_START)}
-                          nextDisabled={startMinutes + 2 * SLOT_MINUTES > timeToMinutes(DAY_END)}
-                        />
-                        <Stepper
-                          label="종료"
-                          value={minutesToTime(endMinutes)}
-                          onPrev={() => setEndMs(endMs - SLOT_MS)}
-                          onNext={() => setEndMs(endMs + SLOT_MS)}
-                          prevDisabled={endMs - SLOT_MS <= startMs}
-                          nextDisabled={endMinutes + SLOT_MINUTES > timeToMinutes(DAY_END)}
-                        />
+                        <DateTimeField label="시작" mode="time" value={startMs} display={minutesToTime(startMinutes)} onChange={onPickStart} />
+                        <DateTimeField label="종료" mode="time" value={endMs} display={minutesToTime(endMinutes)} onChange={onPickEnd} />
                       </View>
-                      {isPast ? <Text style={styles.error}>이미 지난 시간이에요. 날짜나 시간을 바꿔 주세요.</Text> : null}
+                      {timeError ? <Text style={styles.error}>{timeError}</Text> : null}
                     </Section>
 
                     <View style={styles.divider} />
@@ -225,7 +232,7 @@ export function ConfirmAppointmentPopup({ visible, roomId, onClose, onConfirmed,
                     <Button
                       label={busy ? (isEdit ? '변경 중...' : '확정 중...') : isEdit ? '변경' : '확정'}
                       onPress={onSubmit}
-                      disabled={!place.trim() || isPast || busy}
+                      disabled={!place.trim() || timeError !== null || busy}
                     />
                   </View>
                 </View>
@@ -253,49 +260,6 @@ function Section({ icon, label, children }: { icon: IconName; label: string; chi
   );
 }
 
-function Stepper({
-  label,
-  value,
-  onPrev,
-  onNext,
-  prevDisabled = false,
-  nextDisabled = false,
-}: {
-  label: string;
-  value: string;
-  onPrev: () => void;
-  onNext: () => void;
-  prevDisabled?: boolean;
-  nextDisabled?: boolean;
-}) {
-  return (
-    <View style={styles.stepper}>
-      <Text style={styles.stepperLabel}>{label}</Text>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={`${label} 이전`}
-        disabled={prevDisabled}
-        onPress={onPrev}
-        style={[styles.stepButton, prevDisabled && styles.stepButtonDisabled]}
-      >
-        <Icon name="chevron-left" size={18} color={colors.primary} />
-      </Pressable>
-      <Text style={styles.stepperValue} accessibilityLabel={`${label} ${value}`}>
-        {value}
-      </Text>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={`${label} 다음`}
-        disabled={nextDisabled}
-        onPress={onNext}
-        style={[styles.stepButton, nextDisabled && styles.stepButtonDisabled]}
-      >
-        <Icon name="chevron-right" size={18} color={colors.primary} />
-      </Pressable>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
   flex: { flex: 1 },
@@ -310,25 +274,7 @@ const styles = StyleSheet.create({
   sectionHead: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   iconCircle: { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.primaryTint, alignItems: 'center', justifyContent: 'center' },
   sectionLabel: { color: colors.primary, fontSize: fontSize.body - 1, fontWeight: '800' },
-  valueBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    minHeight: 48,
-    paddingHorizontal: spacing.md,
-    borderRadius: radius.control,
-    borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: colors.bg,
-  },
-  valueDate: { color: colors.ink, fontSize: fontSize.body, fontWeight: '600' },
-  valueTime: { color: colors.primary, fontSize: fontSize.body, fontWeight: '800', fontVariant: ['tabular-nums'] },
-  steppers: { gap: 6 },
-  stepper: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  stepperLabel: { width: 36, color: colors.sub, fontSize: fontSize.caption + 1, fontWeight: '700' },
-  stepperValue: { flex: 1, color: colors.ink, fontSize: fontSize.body - 1, fontWeight: '700', textAlign: 'center', fontVariant: ['tabular-nums'] },
-  stepButton: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.primaryTint, alignItems: 'center', justifyContent: 'center' },
-  stepButtonDisabled: { opacity: 0.3 },
+  fields: { gap: 6 },
   input: {
     minHeight: 48,
     paddingHorizontal: spacing.md,

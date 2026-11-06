@@ -48,6 +48,7 @@ export default function RootLayout() {
         <Stack.Screen name="index" />
         <Stack.Screen name="login" />
         <Stack.Screen name="signup" />
+        <Stack.Screen name="guide" options={{ gestureEnabled: false }} />
         <Stack.Screen name="settings" />
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="free-time" />
